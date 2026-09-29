@@ -110,3 +110,36 @@ h1 { font-size: 30px; margin: 0; font-weight: 700; line-height: 1.1; }
   .sheetno { font-size: 40px; }
   h1 { font-size: 24px; }
 }
+
+.action-badge {
+  display: inline-block;
+  font-family: var(--mono);
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 6px 12px;
+  margin-top: 6px;
+  border: 1.5px solid var(--ink);
+  background: var(--paper);
+}
+.action-badge.warn { color: var(--signal); border-color: var(--signal); }
+
+.decision-reason {
+  font-size: 14px;
+  color: var(--muted);
+  margin-top: 10px;
+  line-height: 1.4;
+}
+
+.btn-row { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+.btn {
+  font-family: var(--mono);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  background: var(--paper);
+  border: 1.5px solid var(--ink);
+  padding: 8px 10px;
+  cursor: pointer;
+}
+.btn:hover { background: var(--ink); color: var(--paper); }
