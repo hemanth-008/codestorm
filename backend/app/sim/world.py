@@ -22,6 +22,7 @@ from app.contract.physics import (
 )
 from app.sim.models import Command, RobotModel, make_model
 from app.sim.control import follow
+from app.sim.faults import apply_attack
 
 
 # ---------------------------------------------------------------------------
@@ -261,7 +262,7 @@ class FleetSim:
 
             # --- Apply active attack to the PACKET (not the true state) ---
             if rs.attack and rs.attack_remaining_s > 0:
-                tel = self._apply_attack(rs, tel)
+                tel = apply_attack(tel, rs.attack, rs.rng, rs.attack_remaining_s, rs._last_clean_state)
                 rs.attack_remaining_s -= dt
                 if rs.attack_remaining_s <= 0:
                     rs.attack = None
@@ -322,58 +323,3 @@ class FleetSim:
         )
 
     # ---- Internal ---------------------------------------------------------
-
-    def _apply_attack(self, rs: _RobotSim, tel: Telemetry) -> Telemetry:
-        """Mutate the telemetry packet per the active attack.
-
-        The true state (rs.state) is NEVER changed.
-        """
-        atk = rs.attack
-        if atk is None:
-            return tel
-
-        data = tel.model_dump()
-
-        if atk.kind == "noise":
-            sigma = atk.magnitude
-            data["x"] += rs.rng.gauss(0, sigma)
-            data["y"] += rs.rng.gauss(0, sigma)
-            data["speed"] += rs.rng.gauss(0, sigma * 0.3)
-            data["current"] += rs.rng.gauss(0, sigma * 0.5)
-            data["motor_temp"] += rs.rng.gauss(0, sigma * 0.5)
-            data["speed"] = max(0.0, data["speed"])
-
-        elif atk.kind == "dropout":
-            pass  # handled in step() by skipping the packet
-
-        elif atk.kind == "spoof_freeze":
-            # Replay the snapshot values with advancing seq/ts
-            if rs._last_clean_state:
-                frozen = rs._last_clean_state
-                data["x"] = frozen.x
-                data["y"] = frozen.y
-                data["heading"] = frozen.heading
-                data["speed"] = frozen.speed
-                data["battery"] = frozen.battery
-                data["motor_temp"] = frozen.motor_temp
-                data["current"] = frozen.current
-                data["vibration"] = frozen.vibration
-
-        elif atk.kind == "spoof_jump":
-            # Add a fixed offset to position
-            angle = rs.rng.uniform(0, 2 * math.pi)  # deterministic per-robot rng
-            # Use a fixed angle based on the attack start (rng was seeded)
-            data["x"] += atk.magnitude * math.cos(0.7)
-            data["y"] += atk.magnitude * math.sin(0.7)
-
-        elif atk.kind == "spoof_drift":
-            # Position offset grows over time
-            elapsed = atk.duration_s - rs.attack_remaining_s
-            drift = atk.magnitude * elapsed  # meters
-            data["x"] += drift * math.cos(1.2)
-            data["y"] += drift * math.sin(1.2)
-
-        elif atk.kind == "spoof_battery":
-            data["battery"] = clamp(data["battery"] + atk.magnitude, 0.0, 100.0)
-
-        return Telemetry(**data)
