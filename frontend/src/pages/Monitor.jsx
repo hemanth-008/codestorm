@@ -42,19 +42,19 @@ export default function Monitor() {
               <div>
                 <div className="kpi-label">Messages per second</div>
                 <div className="kpi-value" style={{ fontSize: 32 }}>
-                  {frame.ingest.msgs_per_s.toFixed(1)}
+                  {frame.ingest?.msgs_per_s?.toFixed(1) ?? '--'}
                 </div>
               </div>
               <div>
                 <div className="kpi-label">Dropped Packets</div>
-                <div className="kpi-value" style={{ fontSize: 32, color: frame.ingest.dropped > 0 ? 'var(--signal)' : 'inherit' }}>
-                  {frame.ingest.dropped}
+                <div className="kpi-value" style={{ fontSize: 32, color: frame.ingest?.dropped > 0 ? 'var(--signal)' : 'inherit' }}>
+                  {frame.ingest?.dropped ?? '--'}
                 </div>
               </div>
               <div>
                 <div className="kpi-label">Lag (ms)</div>
                 <div className="kpi-value" style={{ fontSize: 32 }}>
-                  {frame.ingest.lag_ms.toFixed(1)}
+                  {frame.ingest?.lag_ms?.toFixed(1) ?? '--'}
                 </div>
               </div>
               <div>

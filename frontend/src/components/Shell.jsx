@@ -20,8 +20,8 @@ const NAV = [
 
 export default function Shell() {
   const { connected, frame, frameCount } = useFleet();
-  const fleetSync = frame ? frame.fleet_sync.toFixed(1) : '--';
-  const ts = frame ? frame.ts.toFixed(1) : '--';
+  const fleetSync = frame?.fleet_sync != null ? frame.fleet_sync.toFixed(1) : '--';
+  const ts = frame?.ts != null ? frame.ts.toFixed(1) : '--';
   
   // Waking up heuristic: not connected and no frames received yet (or mock is off and it's trying to connect)
   const isWakingUp = !connected && frameCount === 0;

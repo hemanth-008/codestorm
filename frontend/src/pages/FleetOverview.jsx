@@ -50,7 +50,7 @@ export default function FleetOverview() {
           <div className="panel">
             <div className="panel-head">
               <span>Fleet Sync</span>
-              <span className="tag">{frame.fleet_sync.toFixed(1)}</span>
+              <span className="tag">{frame.fleet_sync?.toFixed(1) ?? '--'}</span>
             </div>
             <div className="panel-body">
               <div className="sync-bar-wrap">
