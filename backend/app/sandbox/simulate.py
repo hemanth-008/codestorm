@@ -4,16 +4,10 @@ from __future__ import annotations
 import math
 from typing import Any
 
-from app.contract.physics import ARENA_M, DT, LIMITS, clamp, expected_current, expected_drain_pct_per_s, expected_temp_step, expected_vibration
-from app.contract.schemas import HealthReport, Mission, SimResult, StateVec, TwinSnapshot
-
-try:  # Lane A is present after integration; keep B5 independently testable.
-    from app.sim.control import follow as _lane_a_follow
-    from app.sim.models import make_model as _lane_a_make_model
-except ImportError:  # pragma: no cover - exercised in the pre-merge lane tree
-    _lane_a_follow = None
-    _lane_a_make_model = None
-
+from app.contract.physics import ARENA_M, DT, LIMITS, clamp
+from app.contract.schemas import HealthReport, Mission, SimResult, TwinSnapshot
+from app.sim.control import follow
+from app.sim.models import make_model
 
 SIM_DT = 0.5
 MAX_SIM_SECONDS = 600.0
@@ -45,7 +39,7 @@ def simulate_mission(
         )
 
     current = snap.est.model_copy(deep=True) if hasattr(snap.est, "model_copy") else snap.est.copy(deep=True)
-    model = _lane_a_make_model(snap.robot_type) if _lane_a_make_model is not None else _FallbackModel(snap.robot_type)
+    model = make_model(snap.robot_type)
     waypoint_idx = snap.waypoint_idx
     path: list[tuple[float, float]] = [(current.x, current.y)]
     violations: list[str] = []
@@ -54,29 +48,23 @@ def simulate_mission(
     steps = 0
 
     while not done and elapsed < MAX_SIM_SECONDS:
-        if _lane_a_follow is not None:
-            command, waypoint_idx, done = _lane_a_follow(
-                current,
-                mission.waypoints,
-                waypoint_idx,
-                mission.cruise_speed,
-                snap.robot_type,
-            )
-        else:
-            command, waypoint_idx, done = _fallback_follow(
-                current,
-                mission.waypoints,
-                waypoint_idx,
-                mission.cruise_speed,
-                snap.robot_type,
-            )
+        command, waypoint_idx, done = follow(
+            current,
+            mission.waypoints,
+            waypoint_idx,
+            mission.cruise_speed,
+            snap.robot_type,
+        )
+        
         previous_speed = current.speed
         current = model.step(current, command, SIM_DT, wear=0.0)
         elapsed += SIM_DT
         steps += 1
         path.append((current.x, current.y))
+        
         limits = LIMITS[snap.robot_type]
         acceleration = abs(current.speed - previous_speed) / SIM_DT
+        
         if current.speed > limits["vmax"] + 1e-6:
             _add_violation(violations, "speed limit exceeded")
         if acceleration > limits["amax"] + 1e-6:
@@ -96,6 +84,7 @@ def simulate_mission(
     risk = _risk(current.battery, health, violations)
     safe = not violations
     notes = "Mission satisfies the sandbox safety gate." if safe else "; ".join(violations)
+    
     return SimResult(
         mission_id=mission.mission_id,
         robot_id=mission.robot_id,
@@ -130,64 +119,3 @@ def _risk(end_battery: float, health: HealthReport | None, violations: list[str]
     if health is not None:
         risk += (1.0 - health.health_index) * 0.4
     return clamp(risk, 0.0, 1.0)
-
-
-class _FallbackModel:
-    """Small contract-only model used until Lane A's model is integrated."""
-
-    def __init__(self, robot_type: str) -> None:
-        self.robot_type = robot_type
-
-    def step(self, state: StateVec, command: Any, dt: float, wear: float = 0.0) -> StateVec:
-        """Advance a bounded unicycle and apply shared battery/thermal formulas."""
-        limits = LIMITS[self.robot_type]
-        desired_speed = 0.0 if wear >= 1.0 else clamp(command.speed, 0.0, limits["vmax"])
-        speed = state.speed + clamp(
-            desired_speed - state.speed,
-            -limits["amax"] * dt,
-            limits["amax"] * dt,
-        )
-        speed = clamp(speed, 0.0, limits["vmax"])
-        heading = state.heading + clamp(command.yaw_rate, -limits["wmax"], limits["wmax"]) * dt
-        x = state.x + speed * math.cos(heading) * dt
-        y = state.y + speed * math.sin(heading) * dt
-        current = expected_current(self.robot_type, speed)
-        return StateVec(
-            x=x,
-            y=y,
-            z=20.0 if self.robot_type == "drone" else state.z,
-            heading=heading,
-            speed=speed,
-            battery=max(0.0, state.battery - expected_drain_pct_per_s(self.robot_type, speed) * dt),
-            motor_temp=expected_temp_step(state.motor_temp, current, dt),
-            current=current,
-            vibration=expected_vibration(self.robot_type, speed),
-        )
-
-
-def _fallback_follow(
-    state: StateVec,
-    waypoints: list,
-    index: int,
-    cruise: float,
-    robot_type: str,
-) -> tuple[Any, int, bool]:
-    """Follow the next waypoint when Lane A's pure-pursuit helper is absent."""
-    from types import SimpleNamespace
-
-    if not waypoints:
-        return SimpleNamespace(speed=0.0, yaw_rate=0.0), index, True
-    target = waypoints[index % len(waypoints)]
-    dx, dy = target.x - state.x, target.y - state.y
-    distance = math.hypot(dx, dy)
-    if distance < 3.0:
-        index += 1
-        if index >= len(waypoints):
-            return SimpleNamespace(speed=0.0, yaw_rate=0.0), index, True
-        target = waypoints[index]
-        dx, dy = target.x - state.x, target.y - state.y
-    desired = math.atan2(dy, dx)
-    error = (desired - state.heading + math.pi) % (2.0 * math.pi) - math.pi
-    wmax = LIMITS[robot_type]["wmax"]
-    speed = min(abs(cruise), LIMITS[robot_type]["vmax"])
-    return SimpleNamespace(speed=speed, yaw_rate=clamp(2.0 * error, -wmax, wmax)), index, False

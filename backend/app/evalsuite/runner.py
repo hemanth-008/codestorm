@@ -7,18 +7,15 @@ import random
 from dataclasses import dataclass
 from typing import Iterable
 
-from app.contract.physics import DROPOUT_TIMEOUT_S, DT, SYNC_TOL_M, clamp
-from app.contract.schemas import EvalResult, EvalRow, EvalSummary, StateVec, Telemetry, TwinState
+from app.contract.physics import DROPOUT_TIMEOUT_S, DT
+from app.contract.schemas import EvalResult, EvalRow, EvalSummary, Telemetry
 from app.detect.noise import NoiseMonitor
 from app.detect.spoof import SpoofGuard
 from app.health.health import HealthEstimator
+from app.twin.engine import TwinEngine
 from .scenarios import Scenario, scenarios
 
-try:
-    from tests.fixtures import clean_stream, dropout_stream, noisy_stream, spoof_stream, wear_ramp_stream
-except ImportError:  # Support direct pytest invocation with tests/ on sys.path.
-    from fixtures import clean_stream, dropout_stream, noisy_stream, spoof_stream, wear_ramp_stream
-
+from tests.fixtures import clean_stream, dropout_stream, noisy_stream, spoof_stream, wear_ramp_stream
 
 @dataclass
 class _ScenarioMetrics:
@@ -97,22 +94,32 @@ def _run_scenario(scenario: Scenario, seed: int) -> _ScenarioMetrics:
             duration_s=10.0,
             seed=seed,
         )
-    baseline = {packet.seq: packet for packet in clean}
+        
+    engine = TwinEngine("R1", "rover")
     spoof_guard = SpoofGuard()
     noise_monitor = NoiseMonitor()
     metrics = _ScenarioMetrics()
     previous_ts: float | None = None
     dropout_started: float | None = None
+    
+    # We must properly handle dropouts by ticking the engine when there's a gap
+    # But for a streaming eval, we can just feed packets directly. Since it's a test
+    # suite with a known clean sequence, we'll emulate the realtime pipeline loop:
+    # Actually, the TwinEngine mode changes when tick(sim_now) is called without packets
+    # To keep it simple, we will call tick() if there is a gap > DROPOUT_TIMEOUT_S
+    
     for packet in packets:
-        reference = baseline.get(packet.seq, packet)
-        residual = math.hypot(packet.x - reference.x, packet.y - reference.y)
-        twin = _twin(packet, residual, previous_ts)
-        events = spoof_guard.update(packet, twin) + noise_monitor.update(twin)
-        if previous_ts is not None and packet.ts - previous_ts > DROPOUT_TIMEOUT_S:
+        # If there's a large gap (dropout), we must tick the engine to trigger dead reckoning
+        if previous_ts is not None and (packet.ts - previous_ts) > DROPOUT_TIMEOUT_S:
             dropout_started = previous_ts
             if scenario.kind == "dropout":
                 metrics.detected = True
                 metrics.time_to_detect_s = packet.ts - scenario.attack_start_s
+            engine.tick(packet.ts - 1e-6) # Tick just before the next packet arrives
+        
+        twin = engine.on_telemetry(packet)
+        events = spoof_guard.update(packet, twin) + noise_monitor.update(twin)
+        
         for event in events:
             if event.kind in {"spoof_suspected", "noise_high"} and scenario.kind != "clean":
                 metrics.detected = True
@@ -121,58 +128,31 @@ def _run_scenario(scenario: Scenario, seed: int) -> _ScenarioMetrics:
                     metrics.time_to_detect_s = elapsed
             elif scenario.kind == "clean":
                 metrics.false_alarms += 1
+                
         metrics.min_sync = min(metrics.min_sync, twin.sync_score)
+        
         if dropout_started is not None and packet.ts >= dropout_started + 1.0 and metrics.recovery_s is None:
             metrics.recovery_s = packet.ts - dropout_started
+            
         previous_ts = packet.ts
+        
     if scenario.kind == "clean":
         # Deviation/noise/spoof detectors should remain quiet on the baseline.
         metrics.min_sync = max(metrics.min_sync, 90.0)
     return metrics
 
 
-def _twin(packet: Telemetry, residual: float, previous_ts: float | None) -> TwinState:
-    """Build the smallest twin sample required by the detector interfaces."""
-    state = StateVec(
-        x=packet.x,
-        y=packet.y,
-        z=packet.z,
-        heading=packet.heading,
-        speed=packet.speed,
-        battery=packet.battery,
-        motor_temp=packet.motor_temp,
-        current=packet.current,
-        vibration=packet.vibration,
-    )
-    since = 0.0 if previous_ts is None else max(0.0, packet.ts - previous_ts)
-    mode = "dead_reckoning" if since > DROPOUT_TIMEOUT_S else "synced"
-    sync_score = 100.0 * clamp(1.0 - residual / SYNC_TOL_M, 0.0, 1.0)
-    if mode == "dead_reckoning":
-        sync_score = min(sync_score, 100.0 * math.exp(-since / 8.0))
-    return TwinState(
-        robot_id=packet.robot_id,
-        ts=packet.ts,
-        mode=mode,
-        pred=state,
-        est=state,
-        residual_pos=residual,
-        residual_norm=residual / SYNC_TOL_M,
-        cross_track_err=0.0,
-        heading_err=0.0,
-        sync_score=sync_score,
-        confidence=1.0,
-        since_last_packet_s=since,
-    )
-
-
 def _rul_error_pct(seed: int) -> float:
     """Measure RUL against the known linear wear ramp ground truth."""
     packets = wear_ramp_stream(steps=60, wear_end=0.9, seed=seed)
     estimator = HealthEstimator()
+    engine = TwinEngine("R1", "rover")
     errors: list[float] = []
     slope = 0.9 / ((len(packets) - 1) * DT)
+    
     for index, packet in enumerate(packets):
-        report = estimator.update(packet, _twin(packet, 0.0, None))
+        twin = engine.on_telemetry(packet)
+        report = estimator.update(packet, twin)
         wear = 0.9 * index / (len(packets) - 1)
         if wear >= 0.3 and report.rul_s is not None:
             truth = (1.0 - wear) / slope
