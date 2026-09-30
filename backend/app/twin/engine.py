@@ -163,7 +163,10 @@ class TwinEngine:
         residual_norm = math.sqrt(norm_r)
         
         # 3. Correct (gain)
-        gain = 0.6 if residual_pos <= GATE_M else 0.1
+        if self.mode == "dead_reckoning":
+            gain = 1.0
+        else:
+            gain = 0.6 if residual_pos <= GATE_M else 0.1
         
         def _blend(p, o, g): return p + g * (o - p)
         
@@ -219,10 +222,13 @@ class TwinEngine:
             self.mode = "dead_reckoning"
             
         if self.mode == "dead_reckoning":
-            # In dead reckoning, the estimate IS the prediction
-            pred = self._predict(dt)
-            self.est = pred
-            self.est_ts = now
+            from app.contract.physics import DT
+            
+            # advance the estimate every DT
+            while now - self.est_ts > 1e-3:
+                step_dt = min(DT, now - self.est_ts)
+                self.est = self._predict(step_dt)
+                self.est_ts += step_dt
             
             confidence = math.exp(-since_last / 8.0)
             
@@ -236,7 +242,7 @@ class TwinEngine:
                 robot_id=self.robot_id,
                 ts=now,
                 mode=self.mode,
-                pred=pred,
+                pred=self.est,
                 est=self.est,
                 residual_pos=0.0,
                 residual_norm=0.0,
