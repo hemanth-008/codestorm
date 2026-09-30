@@ -14,6 +14,8 @@ class _SpoofState:
     active: bool = False
     duplicate_count: int = 0
     residual_streak: int = 0
+    drift_streak: int = 0
+    drift_sign: int = 0
     last_event_ts: float | None = None
 
 
@@ -41,6 +43,21 @@ class SpoofGuard:
         """Inspect one packet and its twin residual for spoof indicators."""
         state = self._states.setdefault(tel.robot_id, _SpoofState())
         reasons, metrics = self._indicators(tel, twin, state.previous)
+        speed_bias = float(metrics.get("speed_bias_mps", 0.0))
+        bias_sign = 1 if speed_bias > 0.0 else -1 if speed_bias < 0.0 else 0
+        if (
+            abs(speed_bias) > 0.1
+            and twin.residual_pos < 0.5
+            and bias_sign != 0
+        ):
+            state.drift_streak = state.drift_streak + 1 if bias_sign == state.drift_sign else 1
+            state.drift_sign = bias_sign
+        else:
+            state.drift_streak = 0
+            state.drift_sign = 0
+        if state.drift_streak >= 4:
+            reasons.append("gradual_drift")
+            metrics["drift_streak"] = state.drift_streak
         if twin.residual_pos > self.residual_threshold_m:
             state.residual_streak += 1
         else:
@@ -90,6 +107,7 @@ class SpoofGuard:
             implied_speed_mps=implied_speed,
             acceleration_mps2=acceleration,
             yaw_rate_rps=yaw_rate,
+            speed_bias_mps=implied_speed - abs(tel.speed),
         )
         kinematic_spike = (
             implied_speed > limits["vmax"] * 1.5
