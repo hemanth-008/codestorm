@@ -16,6 +16,7 @@ Shared log. Each lane appends only under its own heading: blockers, contract que
 ## Lane C (frontend)
 - C8: Backend `/api/stream` deviates from CONTRACT by returning Unix time for `ts` instead of simulation seconds. Payload snippet: `{"ts":1790770672.6133218,"robots":[{"robot_id":"R1",...}], "events":[...], "fleet_sync":97.95, "ingest":{"msgs_per_s":14.89,"dropped":0,"lag_ms":1790769845939.6584}}`. Workaround added in `useFleetStream.js` to extract `ts` from the first robot's telemetry.
 - C8: Scorecard RUL error percentage was being multiplied by 100 in the UI but backend already returns it as a percentage. Fixed in `Scorecard.jsx`.
+- C9: Need backend to expose "AUTH ON/OFF" and "SIGNED TELEMETRY ON/OFF" status via `/api/health` or `stream` payload so the frontend can render the security chip in the header.
 ## Lane D (ops)
 
 - D5 assumes images are published as `ghcr.io/hemanth-008/fleettwin-{backend,frontend}:latest`; replace registry paths before deploy. Kubernetes API validation was unavailable locally because no cluster is configured; manifests were reviewed and backend tests pass.
