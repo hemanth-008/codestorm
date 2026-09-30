@@ -143,3 +143,17 @@ h1 { font-size: 30px; margin: 0; font-weight: 700; line-height: 1.1; }
   cursor: pointer;
 }
 .btn:hover { background: var(--ink); color: var(--paper); }
+/* Shell & Nav */
+.nav-bar { display: flex; gap: 4px; border-bottom: 1.5px solid var(--ink); padding-bottom: 10px; margin-bottom: 18px; flex-wrap: wrap; }
+.nav-link { font-family: var(--mono); font-size: 13px; text-transform: uppercase; color: var(--muted); text-decoration: none; padding: 6px 12px; display: inline-flex; align-items: center; gap: 8px; border: 1.5px solid transparent; }
+.nav-link:hover { color: var(--ink); border-color: var(--grid); }
+.nav-link.active { color: var(--ink); border-color: var(--ink); font-weight: 700; background: var(--panel); }
+.nav-icon { font-size: 14px; }
+.mono-sm { font-family: var(--mono); font-size: 11px; letter-spacing: 0.04em; color: var(--muted); text-transform: uppercase; }
+.page-content { min-height: 400px; }
+.sheet-footer { display: flex; justify-content: space-between; border-top: 1.5px solid var(--ink); margin-top: 24px; padding-top: 12px; font-family: var(--mono); font-size: 11px; color: var(--muted); text-transform: uppercase; }
+.empty-state { text-align: center; padding: 60px 20px; font-family: var(--mono); color: var(--muted); font-size: 14px; border: 1.5px dashed var(--grid); }
+.sync-bar-wrap { height: 12px; background: var(--paper); border: 1px solid var(--ink); width: 100%; position: relative; }
+.sync-bar-fill { height: 100%; background: var(--signal); transition: width 0.3s linear; }
+.btn-active { background: var(--ink); color: var(--paper); }
+
