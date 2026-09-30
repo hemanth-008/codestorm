@@ -15,7 +15,7 @@ from typing import Optional
 
 from app.contract.schemas import (
     AttackKind, AttackSpec, GroundTruth, Mission,
-    RobotType, StateVec, Telemetry, Waypoint,
+    RobotType, StateVec, Telemetry, Waypoint, Event
 )
 from app.contract.physics import (
     ARENA_M, DT, DEFAULT_CRUISE, FAILURE_WEAR, clamp,
@@ -95,6 +95,8 @@ class _RobotSim:
     attack: Optional[AttackSpec] = None
     attack_remaining_s: float = 0.0
     _last_clean_state: Optional[StateVec] = None  # for spoof_freeze
+
+    recharge_remaining_s: float = 0.0
 
 
 # ---------------------------------------------------------------------------
@@ -184,6 +186,7 @@ class FleetSim:
         self._rng = random.Random(seed)
         self.now: float = 0.0
         self._obstacles = list(DEFAULT_OBSTACLES)
+        self.events: list[Event] = []
 
         robot_ids = robots or ["R1", "D1", "G1"]
         starts = _default_starts()
@@ -215,20 +218,44 @@ class FleetSim:
         packets: list[Telemetry] = []
 
         for rs in self._robots.values():
-            # --- Wear ---
-            if rs.wear < FAILURE_WEAR:
-                rs.wear += rs.wear_rate * dt
-                rs.wear = min(rs.wear, FAILURE_WEAR)
-
-            # --- Control ---
-            cmd = Command(speed=0.0, yaw_rate=0.0)
-            if rs.mission and rs.wear < FAILURE_WEAR:
-                cmd, rs.wp_idx, _done = follow(
-                    rs.state, rs.mission.waypoints, rs.wp_idx,
-                    rs.mission.cruise_speed, rs.robot_type,
-                )
-                if _done and rs.mission.loop:
-                    rs.wp_idx = 0
+            # --- Auto-recharge ---
+            if rs.recharge_remaining_s > 0:
+                rs.recharge_remaining_s -= dt
+                rs.state.battery += (100.0 / 20.0) * dt
+                rs.state.battery = min(100.0, rs.state.battery)
+                cmd = Command(speed=0.0, yaw_rate=0.0)
+                if rs.recharge_remaining_s <= 0:
+                    rs.recharge_remaining_s = 0.0
+                    rs.state.battery = 100.0
+            else:
+                # --- Wear ---
+                if rs.wear < FAILURE_WEAR:
+                    rs.wear += rs.wear_rate * dt
+                    rs.wear = min(rs.wear, FAILURE_WEAR)
+    
+                # --- Control ---
+                cmd = Command(speed=0.0, yaw_rate=0.0)
+                if rs.mission and rs.wear < FAILURE_WEAR:
+                    old_idx = rs.wp_idx
+                    cmd, rs.wp_idx, _done = follow(
+                        rs.state, rs.mission.waypoints, rs.wp_idx,
+                        rs.mission.cruise_speed, rs.robot_type,
+                    )
+                    
+                    if old_idx == 0 and rs.wp_idx == 1 and rs.state.battery < 30.0:
+                        rs.recharge_remaining_s = 20.0
+                        cmd = Command(speed=0.0, yaw_rate=0.0)
+                        self.events.append(Event(
+                            id=str(uuid.uuid4()),
+                            ts=self.now,
+                            robot_id=rs.robot_id,
+                            kind="recharge_started",
+                            severity="info",
+                            message=f"Battery low ({rs.state.battery:.1f}%), auto-recharging at base."
+                        ))
+    
+                    if _done and rs.mission.loop:
+                        rs.wp_idx = 0
 
             # Obstacle avoidance
             cmd = _swerve_command(rs.state, cmd, self._obstacles, rs.robot_type)

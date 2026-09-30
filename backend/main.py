@@ -42,6 +42,11 @@ async def sim_loop() -> None:
             t0 = time.perf_counter()
             sim = backend_sim_global.fleet_sim
             packets = sim.step(DT)
+            
+            if sim.events:
+                for evt in sim.events:
+                    await pipeline._emit(evt)
+                sim.events.clear()
 
             for tel in packets:
                 try:
