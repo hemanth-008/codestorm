@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fleettwin-config
+data:
+  AUTH_ENABLED: "0"
+  SIM_ENABLED: "1"
+  SIM_SPEED: "1.0"
+  DB_URL: "sqlite:///./fleettwin.db"
+  CORS_ORIGINS: "https://fleettwin.example.com"

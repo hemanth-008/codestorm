@@ -10,4 +10,6 @@ Shared log. Each lane appends only under its own heading: blockers, contract que
 
 ## Lane D (ops)
 
+- D5 assumes images are published as `ghcr.io/hemanth-008/fleettwin-{backend,frontend}:latest`; replace registry paths before deploy. Kubernetes API validation was unavailable locally because no cluster is configured; manifests were reviewed and backend tests pass.
+
 ## Hemanth
