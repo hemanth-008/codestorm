@@ -5,7 +5,10 @@ import math
 
 from app.contract.schemas import StateVec, TwinState
 from app.detect.spoof import SpoofGuard
-from fixtures import clean_stream, noisy_stream, spoof_stream
+try:
+    from tests.fixtures import clean_stream, noisy_stream, spoof_stream
+except ImportError:
+    from fixtures import clean_stream, noisy_stream, spoof_stream
 
 
 def _twin(packet, residual_pos: float = 0.0) -> TwinState:

@@ -4,7 +4,7 @@ from __future__ import annotations
 import math
 
 from app.contract.physics import DT, WEAR_CURRENT_GAIN
-from fixtures import (
+from tests.fixtures import (
     clean_stream,
     dropout_stream,
     noisy_stream,
