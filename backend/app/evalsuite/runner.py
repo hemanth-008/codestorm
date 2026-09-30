@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from typing import Iterable
 
 from app.contract.physics import DROPOUT_TIMEOUT_S, DT
-from app.contract.schemas import AttackSpec, EvalResult, EvalRow, EvalSummary
+from app.contract.schemas import AttackSpec, EvalResult, EvalRow, EvalSummary, Telemetry
 from app.detect.noise import NoiseMonitor
 from app.detect.spoof import SpoofGuard
 from app.health.health import HealthEstimator
@@ -17,6 +17,17 @@ from app.twin.engine import TwinEngine
 from .scenarios import Scenario, scenarios
 
 from tests.fixtures import clean_stream, noisy_stream, spoof_stream, wear_ramp_stream
+
+
+# One-sigma sensor noise in the RUL fixture, expressed in contract units.
+_RUL_SENSOR_NOISE = {
+    "position_m": 0.02,
+    "speed_mps": 0.008,
+    "battery_pct": 0.03,
+    "motor_temp_c": 0.10,
+    "current_a": 0.02,
+    "vibration_g": 0.003,
+}
 
 @dataclass
 class _ScenarioMetrics:
@@ -203,8 +214,13 @@ def _run_dropout_scenario(scenario: Scenario, seed: int) -> _ScenarioMetrics:
 
 
 def _rul_error_pct(seed: int) -> float:
-    """Measure RUL against the known linear wear ramp ground truth."""
-    packets = wear_ramp_stream(steps=60, wear_end=0.9, seed=seed)
+    """Measure noisy-telemetry RUL against the known linear wear ramp.
+
+    Noise is applied only to the synthetic telemetry before it reaches the
+    estimator.  The evaluator alone retains the fixture's wear ramp to score
+    true remaining-life error; ``HealthEstimator`` receives no wear or truth.
+    """
+    packets = _noisy_rul_packets(seed)
     estimator = HealthEstimator()
     engine = TwinEngine("R1", "rover")
     errors: list[float] = []
@@ -220,6 +236,24 @@ def _rul_error_pct(seed: int) -> float:
             truth = (1.0 - wear) / slope
             errors.append(abs(report.rul_s - truth) / max(truth, 1.0) * 100.0)
     return max(errors) if errors else 100.0
+
+
+def _noisy_rul_packets(seed: int) -> list[Telemetry]:
+    """Add seeded, channel-specific Gaussian sensor noise to a wear ramp."""
+    packets = wear_ramp_stream(steps=60, wear_end=0.9, seed=seed)
+    rng = random.Random(seed + 9001)
+    noisy: list[Telemetry] = []
+    for packet in packets:
+        values = packet.model_dump() if hasattr(packet, "model_dump") else packet.dict()
+        values["x"] += rng.gauss(0.0, _RUL_SENSOR_NOISE["position_m"])
+        values["y"] += rng.gauss(0.0, _RUL_SENSOR_NOISE["position_m"])
+        values["speed"] = max(0.0, values["speed"] + rng.gauss(0.0, _RUL_SENSOR_NOISE["speed_mps"]))
+        values["battery"] += rng.gauss(0.0, _RUL_SENSOR_NOISE["battery_pct"])
+        values["motor_temp"] += rng.gauss(0.0, _RUL_SENSOR_NOISE["motor_temp_c"])
+        values["current"] += rng.gauss(0.0, _RUL_SENSOR_NOISE["current_a"])
+        values["vibration"] = max(0.0, values["vibration"] + rng.gauss(0.0, _RUL_SENSOR_NOISE["vibration_g"]))
+        noisy.append(Telemetry(**values))
+    return noisy
 
 
 def _mean(values: Iterable[float | None]) -> float | None:
