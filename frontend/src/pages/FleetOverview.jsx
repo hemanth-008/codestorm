@@ -1,14 +1,32 @@
 /**
- * FleetOverview – placeholder for C2.
+ * FleetOverview (Task C2)
  *
- * Shows a brief status grid for all robots from the stream.
- * Full implementation with arena map, trails, and robot cards comes in C2.
+ * Shows the metric arena map, robot cards, alert feed, and fleet sync gauge.
  */
-
+import { useState, useEffect } from 'react';
 import { useFleet } from '../context/FleetProvider';
+import FleetMap from '../components/FleetMap';
+import RobotCard from '../components/RobotCard';
+import AlertFeed from '../components/AlertFeed';
 
 export default function FleetOverview() {
-  const { frame } = useFleet();
+  const { frame, events } = useFleet();
+  const [trails, setTrails] = useState({});
+
+  // Accumulate trails
+  useEffect(() => {
+    if (!frame) return;
+    setTrails((prev) => {
+      const next = { ...prev };
+      for (const r of frame.robots) {
+        if (!r.telemetry) continue;
+        const pts = next[r.robot_id] || [];
+        // keep last 50 points
+        next[r.robot_id] = [...pts, [r.telemetry.x, r.telemetry.y]].slice(-50);
+      }
+      return next;
+    });
+  }, [frame]);
 
   if (!frame) {
     return <div className="empty-state">Waiting for stream data…</div>;
@@ -16,40 +34,44 @@ export default function FleetOverview() {
 
   return (
     <div>
-      <div className="panel-head" style={{ marginBottom: 12 }}>
-        <span>Fleet Overview</span>
-        <span className="tag">{frame.robots.length} robots</span>
-      </div>
-
-      <div className="kpis" style={{ gridTemplateColumns: `repeat(${frame.robots.length}, 1fr)` }}>
-        {frame.robots.map((r) => (
-          <div key={r.robot_id} className="kpi">
-            <div className="kpi-label">{r.name} ({r.robot_type})</div>
-            <div className="kpi-value" style={{ fontSize: 22 }}>
-              {r.twin.sync_score.toFixed(0)}
-              <span className="kpi-unit">sync</span>
+      <div className="panels">
+        {/* Left column: Map and Sync Gauge */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+          <div className="panel">
+            <div className="panel-head">
+              <span>Fleet Patrol Map</span>
+              <span className="tag">200 x 200 m</span>
             </div>
-            <div className="mono-sm" style={{ marginTop: 6 }}>
-              bat {r.telemetry.battery.toFixed(0)}% &nbsp;
-              spd {r.telemetry.speed.toFixed(1)} m/s &nbsp;
-              hp {(r.health.health_index * 100).toFixed(0)}%
+            <div className="panel-body">
+              <FleetMap frame={frame} trails={trails} />
             </div>
           </div>
-        ))}
-      </div>
-
-      <div className="panel" style={{ marginTop: 18 }}>
-        <div className="panel-head">
-          <span>Fleet Sync</span>
-          <span className="tag">{frame.fleet_sync.toFixed(1)}</span>
+          
+          <div className="panel">
+            <div className="panel-head">
+              <span>Fleet Sync</span>
+              <span className="tag">{frame.fleet_sync.toFixed(1)}</span>
+            </div>
+            <div className="panel-body">
+              <div className="sync-bar-wrap">
+                <div
+                  className="sync-bar-fill"
+                  style={{ width: `${Math.max(0, Math.min(100, frame.fleet_sync))}%` }}
+                />
+              </div>
+            </div>
+          </div>
         </div>
-        <div className="panel-body">
-          <div className="sync-bar-wrap">
-            <div
-              className="sync-bar-fill"
-              style={{ width: `${Math.max(0, Math.min(100, frame.fleet_sync))}%` }}
-            />
+
+        {/* Right column: Cards and Alerts */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {frame.robots.map((r) => (
+              <RobotCard key={r.robot_id} robot={r} />
+            ))}
           </div>
+
+          <AlertFeed events={events} />
         </div>
       </div>
     </div>
