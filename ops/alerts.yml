@@ -1,0 +1,48 @@
+groups:
+  - name: fleettwin-availability
+    rules:
+      - alert: FleetTwinBackendDown
+        expr: up{job="fleettwin-backend"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          service: fleettwin-backend
+        annotations:
+          summary: FleetTwin backend is unreachable
+          description: Prometheus has failed to scrape the FleetTwin backend for two minutes.
+
+  - name: fleettwin-ingest
+    rules:
+      - alert: FleetTwinIngestLag
+        expr: fleettwin_last_ingest_age_seconds > 5
+        for: 2m
+        labels:
+          severity: warning
+          service: fleettwin-backend
+        annotations:
+          summary: FleetTwin telemetry ingest is lagging
+          description: No telemetry packet has been accepted for more than five seconds.
+
+      - alert: FleetTwinDropRateHigh
+        expr: >-
+          rate(fleettwin_dropped_packets_total[5m]) /
+          clamp_min(rate(fleettwin_ingest_messages_total[5m]), 1) > 0.10
+        for: 5m
+        labels:
+          severity: warning
+          service: fleettwin-backend
+        annotations:
+          summary: FleetTwin telemetry drop rate is high
+          description: More than ten percent of telemetry packets have been dropped over five minutes.
+
+  - name: fleettwin-fleet
+    rules:
+      - alert: FleetTwinSyncLow
+        expr: fleettwin_fleet_sync_score < 80
+        for: 5m
+        labels:
+          severity: warning
+          service: fleettwin-backend
+        annotations:
+          summary: FleetTwin fleet sync score is low
+          description: Fleet sync has remained below 80 for five minutes.
