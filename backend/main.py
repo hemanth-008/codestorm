@@ -22,31 +22,40 @@ SIM_SPEED = float(os.environ.get("SIM_SPEED", "1.0"))
 CORS_ORIGINS = os.environ.get("CORS_ORIGINS", "*").split(",")
 
 async def sim_loop():
-    from app.core.pipeline import pipeline
-    # Wait for the server to start fully
-    await asyncio.sleep(1.0)
-    
-    sim = backend_sim_global.fleet_sim
-    while True:
-        t0 = time.perf_counter()
+    try:
+        from app.core.pipeline import pipeline
+        # Wait for the server to start fully
+        await asyncio.sleep(1.0)
         
-        # 1. Step physics
-        packets = sim.step(DT)
-        
-        # 2. Push telemetry to pipeline
-        for tel in packets:
-            await pipeline.process_telemetry(tel)
+        sim = backend_sim_global.fleet_sim
+        while True:
+            t0 = time.perf_counter()
             
-        # 3. Tick twins (dead reckoning detection)
-        await pipeline.tick_twins(sim.now)
-        
-        # Sleep to maintain SIM_SPEED
-        elapsed = time.perf_counter() - t0
-        target_sleep = (DT / SIM_SPEED) - elapsed
-        if target_sleep > 0:
-            await asyncio.sleep(target_sleep)
-        else:
-            await asyncio.sleep(0.001)  # Yield loop
+            # 1. Step physics
+            packets = sim.step(DT)
+            
+            # 2. Push telemetry to pipeline
+            for tel in packets:
+                try:
+                    await pipeline.process_telemetry(tel)
+                except Exception as e:
+                    print(f"Error processing sim telemetry: {e}")
+                
+            # 3. Tick twins (dead reckoning detection)
+            try:
+                await pipeline.tick_twins(sim.now)
+            except Exception as e:
+                print(f"Error ticking twins: {e}")
+            
+            # Sleep to maintain SIM_SPEED
+            elapsed = time.perf_counter() - t0
+            target_sleep = (DT / SIM_SPEED) - elapsed
+            if target_sleep > 0:
+                await asyncio.sleep(target_sleep)
+            else:
+                await asyncio.sleep(0.001)  # Yield loop
+    except asyncio.CancelledError:
+        print("Simulator loop gracefully shutting down.")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -60,6 +69,10 @@ async def lifespan(app: FastAPI):
     
     if task:
         task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
 
 app = FastAPI(lifespan=lifespan)
 
