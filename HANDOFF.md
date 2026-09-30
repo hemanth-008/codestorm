@@ -21,5 +21,6 @@ Shared log. Each lane appends only under its own heading: blockers, contract que
 - D5 assumes images are published as `ghcr.io/hemanth-008/fleettwin-{backend,frontend}:latest`; replace registry paths before deploy. Kubernetes API validation was unavailable locally because no cluster is configured; manifests were reviewed and backend tests pass.
 - D6 alert rules were not run through `promtool` because it is not installed in this worktree; backend metric tests pass and the rule inputs are exposed at `/metrics`.
 - Overnight validation: Docker CLI and Compose parsing work, but Docker Desktop's Linux daemon is unavailable, so image builds and `docker compose up` could not run locally.
+- Overnight manifest validation: only `kubectl` is installed; its client dry run still needs the absent localhost API server, and `kubeconform`/`promtool` are unavailable.
 
 ## Hemanth
