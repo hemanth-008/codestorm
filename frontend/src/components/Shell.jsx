@@ -5,9 +5,9 @@
  * accents, Bahnschrift headings, Consolas for data.
  */
 
-import { NavLink, Outlet } from 'react-router-dom';
+import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useFleet } from '../context/FleetProvider';
-import { resetSim, getToken } from '../api';
+import { resetSim, getToken, clearToken } from '../api';
 
 const NAV = [
   { to: '/', label: 'Fleet', icon: '◉' },
@@ -21,6 +21,8 @@ const NAV = [
 
 export default function Shell() {
   const { connected, frame, frameCount, clearEvents } = useFleet();
+  const navigate = useNavigate();
+  
   const fleetSync = frame?.fleet_sync != null ? frame.fleet_sync.toFixed(1) : '--';
   const ts = frame?.ts != null ? frame.ts.toFixed(1) : '--';
   
@@ -38,14 +40,22 @@ export default function Shell() {
     }
   };
 
-  let isOperator = true;
+  let role = null;
   const token = getToken();
   if (token) {
     try {
       const payload = JSON.parse(atob(token.split('.')[1]));
-      isOperator = payload.role === 'operator';
+      role = payload.role;
+      isOperator = role === 'operator';
     } catch { }
   }
+
+  const handleLogout = () => {
+    clearToken();
+    navigate('/');
+  };
+
+  const navItems = NAV.filter(n => n.to !== '/login' || !token);
 
   return (
     <div className="sheet">
@@ -80,7 +90,7 @@ export default function Shell() {
 
       {/* ── Navigation ────────────────────────────── */}
       <nav className="nav-bar">
-        {NAV.map(({ to, label, icon }) => (
+        {navItems.map(({ to, label, icon }) => (
           <NavLink
             key={to}
             to={to}
@@ -91,6 +101,16 @@ export default function Shell() {
             {label}
           </NavLink>
         ))}
+        {token && (
+          <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 12 }}>
+            <span className="mono-sm" style={{ fontWeight: 'bold' }}>
+              ROLE: {role.toUpperCase()}
+            </span>
+            <button className="nav-link" onClick={handleLogout} style={{ background: 'transparent', border: 'none', cursor: 'pointer' }}>
+              LOGOUT
+            </button>
+          </div>
+        )}
       </nav>
 
       {/* ── Page content ──────────────────────────── */}

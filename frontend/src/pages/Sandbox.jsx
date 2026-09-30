@@ -5,7 +5,7 @@
  */
 import { useState, useMemo } from 'react';
 import { useFleet } from '../context/FleetProvider';
-import { simulateMission, deployMission } from '../api';
+import { simulateMission, deployMission, getToken } from '../api';
 
 const ROBOT_IDS = ['R1', 'D1', 'G1'];
 
@@ -16,6 +16,15 @@ export default function Sandbox() {
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+
+  let isOperator = true;
+  const token = getToken();
+  if (token) {
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      isOperator = payload.role === 'operator';
+    } catch { }
+  }
 
   const handleMapClick = (e) => {
     // Basic SVG click coordinate mapping
@@ -174,10 +183,11 @@ export default function Sandbox() {
                   className="btn" 
                   style={{ width: '100%', marginTop: 16, fontWeight: 'bold' }} 
                   onClick={handleDeploy} 
-                  disabled={loading || !result.safe_to_deploy}
+                  disabled={loading || !result.safe_to_deploy || !isOperator}
                 >
                   DEPLOY TO FLEET
                 </button>
+                {!isOperator && <div className="mono-sm" style={{ marginTop: 6, color: 'var(--muted)', textAlign: 'center' }}>Viewer access only</div>}
               </div>
             )}
           </div>

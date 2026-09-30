@@ -5,7 +5,7 @@
  */
 import { useState } from 'react';
 import { useFleet } from '../context/FleetProvider';
-import { injectAttack, clearAttacks } from '../api';
+import { injectAttack, clearAttacks, getToken } from '../api';
 
 const ROBOT_IDS = ['R1', 'D1', 'G1'];
 const ATTACK_KINDS = ['noise', 'dropout', 'spoof_freeze', 'spoof_jump', 'spoof_drift', 'spoof_battery'];
@@ -18,6 +18,15 @@ export default function Attacks() {
   const [magnitude, setMagnitude] = useState(1.0);
   const [duration, setDuration] = useState(10.0);
   const [loading, setLoading] = useState(false);
+
+  let isOperator = true;
+  const token = getToken();
+  if (token) {
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      isOperator = payload.role === 'operator';
+    } catch { }
+  }
 
   const handleInject = async () => {
     setLoading(true);
@@ -120,13 +129,14 @@ export default function Attacks() {
           </div>
 
           <div className="btn-row" style={{ marginTop: 8 }}>
-            <button className="btn" style={{ flex: 1, padding: 12, fontWeight: 'bold' }} onClick={handleInject} disabled={loading}>
+            <button className="btn" style={{ flex: 1, padding: 12, fontWeight: 'bold' }} onClick={handleInject} disabled={loading || !isOperator}>
               INJECT FAULT
             </button>
-            <button className="btn" style={{ padding: 12 }} onClick={handleClearAll} disabled={loading}>
+            <button className="btn" style={{ padding: 12 }} onClick={handleClearAll} disabled={loading || !isOperator}>
               CLEAR ALL
             </button>
           </div>
+          {!isOperator && <div className="mono-sm" style={{ marginTop: 6, color: 'var(--muted)', textAlign: 'center' }}>Viewer access only</div>}
         </div>
       </div>
 

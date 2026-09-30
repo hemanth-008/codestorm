@@ -5,12 +5,21 @@
  */
 import { useState, useEffect } from 'react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
-import { runEval, getEvalLatest } from '../api';
+import { runEval, getEvalLatest, getToken } from '../api';
 
 export default function Scorecard() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+
+  let isOperator = true;
+  const token = getToken();
+  if (token) {
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      isOperator = payload.role === 'operator';
+    } catch { }
+  }
 
   const fetchLatest = async () => {
     try {
@@ -54,9 +63,12 @@ export default function Scorecard() {
             <span className="mono-sm">
               Runs headless scenarios to measure detection, false alarms, and RUL error.
             </span>
-            <button className="btn" onClick={handleRun} disabled={loading} style={{ padding: '8px 24px', fontWeight: 'bold' }}>
-              {loading ? 'RUNNING SUITE...' : 'RUN ATTACK SUITE'}
-            </button>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+              <button className="btn" onClick={handleRun} disabled={loading || !isOperator} style={{ padding: '8px 24px', fontWeight: 'bold' }}>
+                {loading ? 'RUNNING SUITE...' : 'RUN ATTACK SUITE'}
+              </button>
+              {!isOperator && <span className="mono-sm" style={{ color: 'var(--muted)', fontSize: 10, marginTop: 4 }}>Viewer access only</span>}
+            </div>
           </div>
           {error && <div className="mono-sm" style={{ color: 'var(--signal)', marginTop: 12 }}>Error: {error}</div>}
         </div>
@@ -85,43 +97,43 @@ export default function Scorecard() {
             <div className="panel-body">
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 16 }}>
                 <div>
-                  <div className="kpi-label">Detection Rate</div>
+                  <div className="kpi-label" title="Percentage of attacks correctly identified by the system.">Detection Rate</div>
                   <div className="kpi-value" style={{ fontSize: 28, color: data.summary.detection_rate < 0.8 ? 'var(--signal)' : 'inherit' }}>
                     {(data.summary.detection_rate * 100).toFixed(0)}<span className="kpi-unit">%</span>
                   </div>
                 </div>
                 <div>
-                  <div className="kpi-label">False Alarms/Hr</div>
+                  <div className="kpi-label" title="Number of times the system incorrectly flagged an attack per hour.">False Alarms/Hr</div>
                   <div className="kpi-value" style={{ fontSize: 28, color: data.summary.false_alarms_per_hour > 10 ? 'var(--signal)' : 'inherit' }}>
                     {data.summary.false_alarms_per_hour.toFixed(1)}
                   </div>
                 </div>
                 <div>
-                  <div className="kpi-label">Mean TTD</div>
+                  <div className="kpi-label" title="Average time in seconds the system took to detect an ongoing attack.">Mean TTD</div>
                   <div className="kpi-value" style={{ fontSize: 28 }}>
                     {data.summary.mean_time_to_detect_s?.toFixed(1) || '--'}<span className="kpi-unit">s</span>
                   </div>
                 </div>
                 <div>
-                  <div className="kpi-label">Mean Recovery</div>
+                  <div className="kpi-label" title="Average time in seconds for the robot to return to a safe state after an attack.">Mean Recovery</div>
                   <div className="kpi-value" style={{ fontSize: 28 }}>
                     {data.summary.mean_recovery_s?.toFixed(1) || '--'}<span className="kpi-unit">s</span>
                   </div>
                 </div>
                 <div>
-                  <div className="kpi-label">RUL Error</div>
+                  <div className="kpi-label" title="Error margin in predicting the Remaining Useful Life of components.">RUL Error</div>
                   <div className="kpi-value" style={{ fontSize: 28 }}>
                     {data.summary.rul_error_pct != null ? (data.summary.rul_error_pct).toFixed(1) : '--'}<span className="kpi-unit">%</span>
                   </div>
                 </div>
                 <div>
-                  <div className="kpi-label">Sync Clean</div>
+                  <div className="kpi-label" title="Average synchronization score between the digital twin and real robot under normal conditions.">Sync Clean</div>
                   <div className="kpi-value" style={{ fontSize: 28 }}>
                     {data.summary.mean_sync_clean.toFixed(0)}
                   </div>
                 </div>
                 <div>
-                  <div className="kpi-label">Sync Attacked</div>
+                  <div className="kpi-label" title="Average synchronization score during an attack (lower means the twin correctly deviated).">Sync Attacked</div>
                   <div className="kpi-value" style={{ fontSize: 28, color: 'var(--signal)' }}>
                     {data.summary.mean_sync_attacked.toFixed(0)}
                   </div>

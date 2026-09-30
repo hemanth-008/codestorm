@@ -2,10 +2,20 @@
  * DecisionPanel - shows current decision and manual override buttons.
  */
 import { useState } from 'react';
+import { getToken } from '../api';
 
 export default function DecisionPanel({ decision, onOverride }) {
   const [loading, setLoading] = useState(false);
   const warn = decision && decision.action !== 'CONTINUE';
+
+  let isOperator = true;
+  const token = getToken();
+  if (token) {
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      isOperator = payload.role === 'operator';
+    } catch { }
+  }
 
   const handle = async (action, reason) => {
     setLoading(true);
@@ -44,16 +54,17 @@ export default function DecisionPanel({ decision, onOverride }) {
       <div>
         <div className="kpi-label">Manual Override (15s)</div>
         <div className="btn-row">
-          <button className="btn" disabled={loading} onClick={() => handle('CONTINUE', 'Operator resumed normal patrol')}>
+          <button className="btn" disabled={loading || !isOperator} onClick={() => handle('CONTINUE', 'Operator resumed normal patrol')}>
             Continue
           </button>
-          <button className="btn" disabled={loading} onClick={() => handle('REROUTE', 'Operator requested reroute')}>
+          <button className="btn" disabled={loading || !isOperator} onClick={() => handle('REROUTE', 'Operator requested reroute')}>
             Reroute
           </button>
-          <button className="btn" disabled={loading} onClick={() => handle('RETURN_TO_BASE', 'Operator recalled unit to base')}>
+          <button className="btn" disabled={loading || !isOperator} onClick={() => handle('RETURN_TO_BASE', 'Operator recalled unit to base')}>
             Return to base
           </button>
         </div>
+        {!isOperator && <div className="mono-sm" style={{ marginTop: 6, color: 'var(--muted)' }}>Viewer access only</div>}
       </div>
     </div>
   );
