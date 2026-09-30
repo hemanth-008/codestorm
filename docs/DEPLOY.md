@@ -81,7 +81,16 @@ at 70% average CPU.
 
 - `GET /health` returns status and ingest/drop information.
 - `GET /metrics` exposes request latency, ingest rate, dropped packets, and
-  active alert gauges in Prometheus text format.
+  active alert, ingest age, and fleet sync gauges in Prometheus text format.
 - Keep `AUTH_ENABLED=0` only for local mock/demo use. In deployed environments,
   use a strong `JWT_SECRET`, configure `TELEMETRY_KEY`, and restrict
   `CORS_ORIGINS` to the frontend origin.
+
+## Prometheus alerting
+
+`ops/prometheus.yml` scrapes the backend every 15 seconds and loads
+`ops/alerts.yml`. The rules page alerts when the backend is down, telemetry has
+stopped arriving for two minutes, more than 10% of packets are dropped over
+five minutes, or the fleet sync score stays below 80 for five minutes. Mount
+both files into Prometheus, or copy the rules into an existing Prometheus
+configuration and route alerts through the team's Alertmanager.
