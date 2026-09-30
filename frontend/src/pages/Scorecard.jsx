@@ -111,7 +111,7 @@ export default function Scorecard() {
                 <div>
                   <div className="kpi-label">RUL Error</div>
                   <div className="kpi-value" style={{ fontSize: 28 }}>
-                    {data.summary.rul_error_pct != null ? (data.summary.rul_error_pct * 100).toFixed(1) : '--'}<span className="kpi-unit">%</span>
+                    {data.summary.rul_error_pct != null ? (data.summary.rul_error_pct).toFixed(1) : '--'}<span className="kpi-unit">%</span>
                   </div>
                 </div>
                 <div>

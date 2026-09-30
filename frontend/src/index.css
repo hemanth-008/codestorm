@@ -233,3 +233,16 @@ h1 { font-size: 30px; margin: 0; font-weight: 700; line-height: 1.1; }
   #root { padding: 12px; }
 }
 
+
+/* Visual Polish Pass */
+.animated-number { transition: color 0.3s ease; }
+.alert-pulse { animation: alertPulse 1.5s ease-out; }
+@keyframes alertPulse { 0% { background-color: rgba(255, 90, 31, 0.2); } 100% { background-color: transparent; } }
+.empty-state, .loading-state, .error-state { padding: 40px 20px; text-align: center; font-family: var(--mono); font-size: 14px; border: 1.5px dashed var(--muted); margin: 20px 0; color: var(--muted); background: rgba(248, 246, 238, 0.5); }
+.error-state { border-color: var(--signal); color: var(--signal); }
+.kpi-value { transition: color 0.3s ease; }
+.sync-bar-fill { transition: width 0.6s ease-out, background-color 0.4s; }
+.detection-chip { font-family: var(--mono); font-size: 14px; font-weight: bold; border: 1.5px solid var(--signal); background: var(--paper); color: var(--signal); padding: 4px 10px; display: inline-block; margin-right: 8px; margin-bottom: 8px; }
+.detection-chip.active { background: var(--signal); color: var(--paper); }
+@media (max-width: 600px) { .nav-bar { flex-direction: column; align-items: stretch; text-align: center; } .kpis { grid-template-columns: 1fr 1fr; } .topbar { flex-direction: column; align-items: flex-start; } .panels { grid-template-columns: 1fr; } }
+

@@ -34,7 +34,7 @@ export function useFleetStream() {
   const cleanupRef = useRef(null);
 
   const handleFrame = useCallback((/** @type {import('../types').StreamFrame} */ f) => {
-    setFrame(f);
+    if (f.robots && f.robots.length > 0 && f.ts > 1000000000) { f.ts = f.robots[0].telemetry.ts; }; setFrame(f);
     setFrameCount(c => c + 1);
     setConnected(true);
     if (f.events && f.events.length > 0) {
