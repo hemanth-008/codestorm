@@ -40,7 +40,7 @@ async def sim_loop() -> None:
 
         while True:
             t0 = time.perf_counter()
-
+            sim = backend_sim_global.fleet_sim
             packets = sim.step(DT)
 
             for tel in packets:
