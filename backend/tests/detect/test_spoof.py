@@ -5,6 +5,7 @@ import math
 
 from app.contract.schemas import StateVec, TwinState
 from app.detect.spoof import SpoofGuard
+from app.twin.engine import TwinEngine
 try:
     from tests.fixtures import clean_stream, noisy_stream, spoof_stream
 except ImportError:
@@ -75,8 +76,16 @@ def test_freeze_is_detected_within_three_seconds() -> None:
 
 
 def test_drift_is_detected_within_fifteen_seconds() -> None:
-    _, ts = _first_event("spoof_drift", magnitude=0.5)
-    assert ts <= 19.0
+    engine = TwinEngine("R1", "rover")
+    guard = SpoofGuard()
+    for packet in spoof_stream("spoof_drift", steps=100, magnitude=0.5, start_s=4.0, duration_s=10.0):
+        events = guard.update(packet, engine.on_telemetry(packet))
+        if events:
+            assert events[0].kind == "spoof_suspected"
+            assert "gradual_drift" in events[0].detail["reasons"]
+            assert events[0].ts <= 19.0
+            return
+    raise AssertionError("expected gradual drift spoof event")
 
 
 def test_sequence_regression_is_suspicious() -> None:

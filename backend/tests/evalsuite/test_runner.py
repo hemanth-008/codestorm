@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import time
 
-from app.evalsuite.runner import _run_scenario, run_suite
+from app.evalsuite.runner import _rul_error_pct, _run_scenario, run_suite
 from app.evalsuite.scenarios import scenarios
 
 
@@ -45,3 +45,7 @@ def test_dropout_uses_sim_mission_and_scores_truth_each_tick() -> None:
     assert metrics.max_position_error_m < 6.0
     assert metrics.recovery_s is not None
     assert metrics.recovery_s <= 5.0
+
+
+def test_noisy_rul_error_stays_under_contract_for_required_seeds() -> None:
+    assert all(_rul_error_pct(seed) < 25.0 for seed in range(1, 6))
