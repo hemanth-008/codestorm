@@ -8,14 +8,15 @@ from dataclasses import dataclass
 from typing import Iterable
 
 from app.contract.physics import DROPOUT_TIMEOUT_S, DT
-from app.contract.schemas import EvalResult, EvalRow, EvalSummary, Telemetry
+from app.contract.schemas import AttackSpec, EvalResult, EvalRow, EvalSummary
 from app.detect.noise import NoiseMonitor
 from app.detect.spoof import SpoofGuard
 from app.health.health import HealthEstimator
+from app.sim.world import FleetSim
 from app.twin.engine import TwinEngine
 from .scenarios import Scenario, scenarios
 
-from tests.fixtures import clean_stream, dropout_stream, noisy_stream, spoof_stream, wear_ramp_stream
+from tests.fixtures import clean_stream, noisy_stream, spoof_stream, wear_ramp_stream
 
 @dataclass
 class _ScenarioMetrics:
@@ -24,6 +25,7 @@ class _ScenarioMetrics:
     false_alarms: int = 0
     min_sync: float = 100.0
     recovery_s: float | None = None
+    max_position_error_m: float | None = None
 
 
 def run_suite(seed: int = 42, fast: bool = True) -> EvalResult:
@@ -72,19 +74,15 @@ def run_suite(seed: int = 42, fast: bool = True) -> EvalResult:
 
 def _run_scenario(scenario: Scenario, seed: int) -> _ScenarioMetrics:
     """Generate one scenario and score detector transitions."""
+    if scenario.kind == "dropout":
+        return _run_dropout_scenario(scenario, seed)
+
     steps = max(1, int(math.ceil(scenario.duration_s / DT)))
     clean = clean_stream(steps=steps, seed=seed)
     if scenario.kind == "clean":
         packets = clean
     elif scenario.kind == "noise":
         packets = noisy_stream(steps=steps, sigma=scenario.magnitude, seed=seed)
-    elif scenario.kind == "dropout":
-        packets = dropout_stream(
-            steps=steps,
-            start_s=scenario.attack_start_s,
-            duration_s=scenario.magnitude,
-            seed=seed,
-        )
     else:
         packets = spoof_stream(
             scenario.kind,
@@ -139,6 +137,68 @@ def _run_scenario(scenario: Scenario, seed: int) -> _ScenarioMetrics:
     if scenario.kind == "clean":
         # Deviation/noise/spoof detectors should remain quiet on the baseline.
         metrics.min_sync = max(metrics.min_sync, 90.0)
+    return metrics
+
+
+def _run_dropout_scenario(scenario: Scenario, seed: int) -> _ScenarioMetrics:
+    """Score dropout against simulator truth at every pipeline simulation tick.
+
+    Two identical simulators keep the delivered stream and true state aligned:
+    one receives the dropout attack while the other supplies clean telemetry as
+    ground truth.  The twin receives the same mission that ``sim_loop`` assigns,
+    and ``tick(now)`` runs once per ``DT`` after packet processing, matching
+    ``Pipeline.tick_twins``.  Position error is ``hypot(est.x-truth.x,
+    est.y-truth.y)`` at every tick, including ticks without a returned TwinState.
+    """
+    truth_sim = FleetSim(seed=seed, robots=["R1"])
+    observed_sim = FleetSim(seed=seed, robots=["R1"])
+    engine = TwinEngine("R1", "rover")
+    engine.set_mission(observed_sim.missions()["R1"])
+    metrics = _ScenarioMetrics(max_position_error_m=0.0)
+    reconnect_ts: float | None = None
+    attack_injected = False
+    previous_packet_ts: float | None = None
+    steps = max(1, int(math.ceil(scenario.duration_s / DT)))
+
+    for _ in range(steps):
+        next_ts = observed_sim.now + DT
+        if not attack_injected and next_ts >= scenario.attack_start_s:
+            observed_sim.inject(
+                AttackSpec(
+                    robot_id="R1",
+                    kind="dropout",
+                    magnitude=0.0,
+                    duration_s=scenario.magnitude,
+                )
+            )
+            attack_injected = True
+
+        truth_packet = truth_sim.step(DT)[0]
+        packets = observed_sim.step(DT)
+        twin = None
+        for packet in packets:
+            if previous_packet_ts is not None and packet.ts - previous_packet_ts > DROPOUT_TIMEOUT_S:
+                reconnect_ts = packet.ts
+                metrics.detected = True
+                metrics.time_to_detect_s = packet.ts - scenario.attack_start_s
+            twin = engine.on_telemetry(packet)
+            metrics.min_sync = min(metrics.min_sync, twin.sync_score)
+            previous_packet_ts = packet.ts
+
+        tick_twin = engine.tick(observed_sim.now)
+        if tick_twin is not None:
+            twin = tick_twin
+            metrics.min_sync = min(metrics.min_sync, tick_twin.sync_score)
+            if reconnect_ts is not None and metrics.recovery_s is None and tick_twin.sync_score >= 80.0:
+                metrics.recovery_s = observed_sim.now - reconnect_ts
+
+        if reconnect_ts is not None and metrics.recovery_s is None and twin is not None and twin.sync_score >= 80.0:
+            metrics.recovery_s = observed_sim.now - reconnect_ts
+
+        if engine.est is not None:
+            error_m = math.hypot(engine.est.x - truth_packet.x, engine.est.y - truth_packet.y)
+            metrics.max_position_error_m = max(metrics.max_position_error_m or 0.0, error_m)
+
     return metrics
 
 

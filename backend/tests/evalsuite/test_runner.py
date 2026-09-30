@@ -3,7 +3,8 @@ from __future__ import annotations
 
 import time
 
-from app.evalsuite.runner import run_suite
+from app.evalsuite.runner import _run_scenario, run_suite
+from app.evalsuite.scenarios import scenarios
 
 
 def test_run_suite_is_seeded_and_contract_shaped() -> None:
@@ -33,3 +34,14 @@ def test_seed_one_noise_timing_uses_zero_second_injection_start() -> None:
 
     assert noise.time_to_detect_s is not None
     assert 0.0 < noise.time_to_detect_s <= 5.0
+
+
+def test_dropout_uses_sim_mission_and_scores_truth_each_tick() -> None:
+    scenario = next(item for item in scenarios() if item.name == "dropout_10s")
+
+    metrics = _run_scenario(scenario, seed=1)
+
+    assert metrics.max_position_error_m is not None
+    assert metrics.max_position_error_m < 6.0
+    assert metrics.recovery_s is not None
+    assert metrics.recovery_s <= 5.0
