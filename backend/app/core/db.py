@@ -101,3 +101,13 @@ def append_history(state: TwinState):
 
 def append_event_cache(evt: Event):
     events_cache.append(evt)
+
+def reset_db():
+    cur = conn.cursor()
+    cur.execute("DELETE FROM telemetry")
+    cur.execute("DELETE FROM twin_state")
+    cur.execute("DELETE FROM events")
+    cur.execute("DELETE FROM missions")
+    conn.commit()
+    history_cache.clear()
+    events_cache.clear()

@@ -40,8 +40,13 @@ async def sim_loop() -> None:
 
         while True:
             t0 = time.perf_counter()
-
+            sim = backend_sim_global.fleet_sim
             packets = sim.step(DT)
+            
+            if sim.events:
+                for evt in sim.events:
+                    await pipeline._emit(evt)
+                sim.events.clear()
 
             for tel in packets:
                 try:
@@ -54,6 +59,13 @@ async def sim_loop() -> None:
             except Exception as e:
                 print(f"Error ticking twins: {e}")
 
+            if len(pipeline.last_health) > 0 and len(pipeline.last_health) == len(sim.missions()):
+                if all(h.status == "critical" for h in pipeline.last_health.values()):
+                    print("All robots critical. Scheduling automatic reset...")
+                    from app.api.endpoints import reset_sim
+                    reset_sim(42)
+                    continue
+
             elapsed = time.perf_counter() - t0
             target_sleep = (DT / SIM_SPEED) - elapsed
             if target_sleep > 0:
@@ -64,6 +76,13 @@ async def sim_loop() -> None:
         print("Simulator loop gracefully shutting down.")
 
 
+def _prewarm_eval():
+    from app.evalsuite import run_suite
+    from app.api import endpoints
+    import time
+    res = run_suite(seed=1, fast=True)
+    endpoints._last_eval = res.model_copy(update={"ts": time.time()})
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
@@ -71,6 +90,9 @@ async def lifespan(app: FastAPI):
     task = None
     if SIM_ENABLED:
         task = asyncio.create_task(sim_loop())
+        
+    loop = asyncio.get_running_loop()
+    loop.run_in_executor(None, _prewarm_eval)
 
     yield
 

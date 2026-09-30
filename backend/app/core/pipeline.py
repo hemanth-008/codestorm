@@ -81,6 +81,24 @@ class Pipeline:
             self.health_estimators[robot_id] = HealthEstimator()
             self.active_attacks[robot_id] = []
 
+    def reset(self) -> None:
+        self.twins.clear()
+        self.spoof_guards.clear()
+        self.noise_monitors.clear()
+        self.dev_detectors.clear()
+        self.health_estimators.clear()
+        self.last_health.clear()
+        self.last_decision.clear()
+        self.active_attacks.clear()
+        self.recent_events.clear()
+        self.active_override = None
+        self.new_events_for_stream.clear()
+        self.msg_count = 0
+        self.dropped_count = 0
+        self.last_ingest_time = time.time()
+        self.lag_ms = 0.0
+        self.ingest_stats = IngestStats()
+
     def set_override(self, override: OverrideState | None) -> None:
         self.active_override = override
 

@@ -142,6 +142,30 @@ def clear_attacks(req: dict | None = None):
 # ---------------------------------------------------------------------------
 # Missions
 # ---------------------------------------------------------------------------
+@router.post("/sim/reset")
+def reset_sim(seed: int = Query(42)):
+    import backend_sim_global
+    from app.sim.world import FleetSim
+    from app.core.db import reset_db
+    
+    # 1. Recreate FleetSim
+    backend_sim_global.fleet_sim = FleetSim(seed=seed)
+    
+    # 2. Reset Pipeline
+    pipeline.reset()
+    
+    # 3. Reset DB and Caches
+    reset_db()
+    
+    # 4. Re-init twins
+    sim = backend_sim_global.fleet_sim
+    for rid, mission in sim.missions().items():
+        rtype = sim._robots[rid].robot_type
+        pipeline.init_robot(rid, rtype)
+        pipeline.twins[rid].set_mission(mission)
+        
+    return {"status": "reset", "seed": seed}
+
 @router.get("/missions")
 def get_missions():
     import backend_sim_global
@@ -190,12 +214,12 @@ def deploy_mission_endpoint(mission: Mission, force: int = Query(0)):
 
 # ---------------------------------------------------------------------------
 # Eval suite
-# ---------------------------------------------------------------------------
 @router.post("/eval/run")
-def run_eval(seed: int = Query(42)):
+async def run_eval(seed: int = Query(42)):
     global _last_eval
+    loop = asyncio.get_running_loop()
     t0 = time.perf_counter()
-    result = _run_suite(seed=seed, fast=True)
+    result = await loop.run_in_executor(None, lambda: _run_suite(seed=seed, fast=True))
     elapsed = time.perf_counter() - t0
     # Stamp with wall time
     result = result.model_copy(update={"ts": time.time()})
