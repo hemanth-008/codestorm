@@ -7,7 +7,9 @@ Shared log. Each lane appends only under its own heading: blockers, contract que
 ## Lane B (analytics)
 
 ## Lane C (frontend)
-
+- Tasks C1 through C7 are complete and pushed to `lane-frontend`.
+- Built-in mock stream works and UI supports the required views (Scorecard, Map, Detail, Attacks).
+- Ready to start C8 (Connect to real backend) when instructed.
 ## Lane D (ops)
 
 ## Hemanth
