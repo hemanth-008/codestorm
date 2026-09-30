@@ -46,17 +46,17 @@ export default function FleetMap({ frame, trails }) {
                 points={routePath} 
                 fill="none" 
                 stroke="#161616" 
-                strokeWidth="0.8" 
-                strokeDasharray="2 2" 
-                opacity={0.5}
+                strokeWidth="1.5" 
+                strokeDasharray="3 3" 
+                opacity={0.6}
               />
             )}
             
             {/* Waypoints */}
             {mission?.waypoints.map((wp, i) => (
               <g key={`wp-${r.robot_id}-${i}`}>
-                <rect x={wp.x - 1.5} y={wp.y - 1.5} width="3" height="3" fill="#F1EEE4" stroke="#161616" strokeWidth="0.4" />
-                <text x={wp.x + 2} y={wp.y - 2} fontSize="3" fontFamily="Consolas" fill="#161616" transform="scale(1, -1)">
+                <rect x={wp.x - 2} y={wp.y - 2} width="4" height="4" fill="#F1EEE4" stroke="#161616" strokeWidth="0.8" />
+                <text x={wp.x + 3} y={wp.y - 2.5} fontSize="3.5" fontFamily="Consolas" fontWeight="bold" fill="#161616" transform="scale(1, -1)">
                   {`W${i}`}
                 </text>
               </g>
@@ -68,7 +68,7 @@ export default function FleetMap({ frame, trails }) {
                 points={tr.map(p => p.join(',')).join(' ')} 
                 fill="none" 
                 stroke="#FF5A1F" 
-                strokeWidth="1.2" 
+                strokeWidth="2.0" 
               />
             )}
 
@@ -78,23 +78,23 @@ export default function FleetMap({ frame, trails }) {
                 {/* Heading line */}
                 <line 
                   x1="0" y1="0" 
-                  x2={8 * Math.cos(r.telemetry.heading)} 
-                  y2={8 * Math.sin(r.telemetry.heading)} 
+                  x2={10 * Math.cos(r.telemetry.heading)} 
+                  y2={10 * Math.sin(r.telemetry.heading)} 
                   stroke="#161616" 
-                  strokeWidth="1" 
+                  strokeWidth="1.5" 
                 />
                 
                 {/* Marker body based on type */}
                 {r.robot_type === 'drone' ? (
-                  <path d="M 0 -3 L 3 3 L -3 3 Z" fill="#FF5A1F" stroke="#161616" strokeWidth="0.5" transform={`rotate(${(r.telemetry.heading * 180 / Math.PI) - 90})`} />
+                  <path d="M 0 -4 L 4 4 L -4 4 Z" fill="#FF5A1F" stroke="#161616" strokeWidth="0.8" transform={`rotate(${(r.telemetry.heading * 180 / Math.PI) - 90})`} />
                 ) : r.robot_type === 'agv' ? (
-                  <rect x="-3" y="-3" width="6" height="6" fill="#FF5A1F" stroke="#161616" strokeWidth="0.5" transform={`rotate(${r.telemetry.heading * 180 / Math.PI})`} />
+                  <rect x="-4" y="-4" width="8" height="8" fill="#FF5A1F" stroke="#161616" strokeWidth="0.8" transform={`rotate(${r.telemetry.heading * 180 / Math.PI})`} />
                 ) : (
-                  <circle cx="0" cy="0" r="3" fill="#FF5A1F" stroke="#161616" strokeWidth="0.5" />
+                  <circle cx="0" cy="0" r="4" fill="#FF5A1F" stroke="#161616" strokeWidth="0.8" />
                 )}
                 
                 {/* Label */}
-                <text x="4" y="-4" fontSize="4" fontFamily="Consolas" fill="#161616" transform="scale(1, -1)">
+                <text x="5" y="-5" fontSize="4.5" fontWeight="bold" fontFamily="Consolas" fill="#161616" transform="scale(1, -1)">
                   {r.name}
                 </text>
               </g>

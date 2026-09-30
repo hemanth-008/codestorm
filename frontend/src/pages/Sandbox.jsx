@@ -188,14 +188,14 @@ export default function Sandbox() {
 
               {/* Start Pos */}
               {startPos && (
-                <circle cx={startPos.x} cy={startPos.y} r="3" fill="#161616" />
+                <circle cx={startPos.x} cy={startPos.y} r="4" fill="#161616" />
               )}
               
               {/* Draft path lines */}
               {waypoints.length > 0 && startPos && (
                 <polyline 
                   points={`${startPos.x},${startPos.y} ` + waypoints.map(p => `${p.x},${p.y}`).join(' ')} 
-                  fill="none" stroke="#161616" strokeWidth="0.8" strokeDasharray="3 3" opacity={0.5} 
+                  fill="none" stroke="#161616" strokeWidth="1.5" strokeDasharray="4 4" opacity={0.6} 
                 />
               )}
 
@@ -203,15 +203,15 @@ export default function Sandbox() {
               {result?.path && result.path.length > 0 && (
                 <polyline 
                   points={result.path.map(p => p.join(',')).join(' ')} 
-                  fill="none" stroke="#FF5A1F" strokeWidth="1.2" 
+                  fill="none" stroke="#FF5A1F" strokeWidth="2.0" 
                 />
               )}
 
               {/* Waypoints */}
               {waypoints.map((wp, i) => (
                 <g key={i}>
-                  <rect x={wp.x - 2} y={wp.y - 2} width="4" height="4" fill="#F1EEE4" stroke="#161616" strokeWidth="0.5" />
-                  <text x={wp.x + 3} y={wp.y - 3} fontSize="4" fontFamily="Consolas" fill="#161616" transform="scale(1, -1)">
+                  <rect x={wp.x - 2.5} y={wp.y - 2.5} width="5" height="5" fill="#F1EEE4" stroke="#161616" strokeWidth="0.8" />
+                  <text x={wp.x + 3.5} y={wp.y - 3.5} fontSize="4.5" fontWeight="bold" fontFamily="Consolas" fill="#161616" transform="scale(1, -1)">
                     {i+1}
                   </text>
                 </g>

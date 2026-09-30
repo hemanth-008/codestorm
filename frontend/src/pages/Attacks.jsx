@@ -155,7 +155,7 @@ export default function Attacks() {
                   <div style={{ display: 'flex', gap: 8, marginTop: 6, flexWrap: 'wrap', minHeight: 28 }}>
                     {det.length === 0 && <span className="mono-sm" style={{ color: 'var(--muted)', marginTop: 4 }}>None</span>}
                     {det.map(d => (
-                      <span key={d} className="action-badge warn" style={{ padding: '2px 6px', fontSize: 12, margin: 0 }}>
+                      <span key={d} className="detection-chip active">
                         {d}
                       </span>
                     ))}

@@ -34,7 +34,7 @@ export default function RobotCard({ robot }) {
           </div>
         </div>
 
-        <div className="kpi-label">Sync Score: {twin.sync_score.toFixed(0)}</div>
+        <div className="kpi-label">Sync Score: <span className="animated-number">{twin.sync_score.toFixed(0)}</span></div>
         <div className="sync-bar-wrap" style={{ margin: '6px 0 14px' }}>
           <div 
             className="sync-bar-fill" 
@@ -48,7 +48,7 @@ export default function RobotCard({ robot }) {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
           <div>
             <div className="kpi-label">Battery</div>
-            <div className="mono-sm" style={{ fontSize: 14 }}>
+            <div className="mono-sm animated-number" style={{ fontSize: 14 }}>
               <span style={{ color: telemetry.battery < 30 ? 'var(--signal)' : 'inherit', fontWeight: 'bold' }}>
                 {telemetry.battery.toFixed(0)}%
               </span>
@@ -56,7 +56,7 @@ export default function RobotCard({ robot }) {
           </div>
           <div>
             <div className="kpi-label">Speed</div>
-            <div className="mono-sm" style={{ fontSize: 14 }}>{telemetry.speed.toFixed(1)} m/s</div>
+            <div className="mono-sm animated-number" style={{ fontSize: 14 }}>{telemetry.speed.toFixed(1)} m/s</div>
           </div>
         </div>
       </div>
