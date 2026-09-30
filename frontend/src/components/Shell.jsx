@@ -40,6 +40,8 @@ export default function Shell() {
     }
   };
 
+  let isOperator = true;
+
   let role = null;
   const token = getToken();
   if (token) {
@@ -128,3 +130,4 @@ export default function Shell() {
     </div>
   );
 }
+
