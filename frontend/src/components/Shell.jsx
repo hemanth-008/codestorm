@@ -15,15 +15,25 @@ const NAV = [
   { to: '/scorecard', label: 'Scorecard', icon: '▦' },
   { to: '/sandbox', label: 'Sandbox', icon: '△' },
   { to: '/monitor', label: 'Monitor', icon: '▤' },
+  { to: '/login', label: 'Login', icon: '⚿' },
 ];
 
 export default function Shell() {
-  const { connected, frame } = useFleet();
+  const { connected, frame, frameCount } = useFleet();
   const fleetSync = frame ? frame.fleet_sync.toFixed(1) : '--';
   const ts = frame ? frame.ts.toFixed(1) : '--';
+  
+  // Waking up heuristic: not connected and no frames received yet (or mock is off and it's trying to connect)
+  const isWakingUp = !connected && frameCount === 0;
 
   return (
     <div className="sheet">
+      {isWakingUp && (
+        <div style={{ background: 'var(--signal)', color: 'var(--paper)', padding: '8px 16px', textAlign: 'center', fontWeight: 'bold', fontSize: 14, marginBottom: 18, fontFamily: 'var(--mono)' }}>
+          Backend is waking up (Render free tier). This may take up to 50 seconds...
+        </div>
+      )}
+
       {/* ── Top bar ───────────────────────────────── */}
       <header className="topbar">
         <div className="title-row">
