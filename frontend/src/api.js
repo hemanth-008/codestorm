@@ -136,6 +136,16 @@ export function clearAttacks(body = {}) {
   });
 }
 
+// ─── Simulation ─────────────────────────────────────────────
+
+/**
+ * Reset the backend simulation.
+ * @returns {Promise<any>}
+ */
+export function resetSim() {
+  return api('/api/sim/reset', { method: 'POST' });
+}
+
 // ─── Missions ───────────────────────────────────────────────
 
 /** @returns {Promise<Object<string, import('./types').Mission>>} */

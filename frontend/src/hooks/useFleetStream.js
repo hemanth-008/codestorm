@@ -72,5 +72,7 @@ export function useFleetStream() {
     return () => es.close();
   }, [handleFrame]);
 
-  return { frame, events, connected, frameCount };
+  const clearEvents = useCallback(() => setEvents([]), []);
+
+  return { frame, events, connected, frameCount, clearEvents };
 }

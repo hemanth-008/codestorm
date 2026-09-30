@@ -66,9 +66,21 @@ export default function FleetOverview() {
         {/* Right column: Cards and Alerts */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {frame.robots.map((r) => (
-              <RobotCard key={r.robot_id} robot={r} />
-            ))}
+            {(() => {
+              if (frame.robots.length > 0 && frame.robots.every(r => r.health?.status === 'critical')) {
+                return (
+                  <div className="error-state" style={{ margin: 0 }}>
+                    <strong>FLEET DEGRADED</strong>
+                    <br /><br />
+                    All robots are in critical state.<br />
+                    Please reset the scenario from the top bar.
+                  </div>
+                );
+              }
+              return frame.robots.map((r) => (
+                <RobotCard key={r.robot_id} robot={r} />
+              ));
+            })()}
           </div>
 
           <AlertFeed events={events} />

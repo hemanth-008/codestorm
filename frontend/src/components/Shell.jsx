@@ -7,6 +7,7 @@
 
 import { NavLink, Outlet } from 'react-router-dom';
 import { useFleet } from '../context/FleetProvider';
+import { resetSim, getToken } from '../api';
 
 const NAV = [
   { to: '/', label: 'Fleet', icon: '◉' },
@@ -19,12 +20,32 @@ const NAV = [
 ];
 
 export default function Shell() {
-  const { connected, frame, frameCount } = useFleet();
+  const { connected, frame, frameCount, clearEvents } = useFleet();
   const fleetSync = frame?.fleet_sync != null ? frame.fleet_sync.toFixed(1) : '--';
   const ts = frame?.ts != null ? frame.ts.toFixed(1) : '--';
   
   // Waking up heuristic: not connected and no frames received yet (or mock is off and it's trying to connect)
   const isWakingUp = !connected && frameCount === 0;
+
+  const handleReset = async () => {
+    if (!confirm('Are you sure you want to reset the simulation?')) return;
+    try {
+      await resetSim();
+      clearEvents();
+    } catch (e) {
+      console.error(e);
+      alert('Failed to reset: ' + e.message);
+    }
+  };
+
+  let isOperator = true;
+  const token = getToken();
+  if (token) {
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      isOperator = payload.role === 'operator';
+    } catch { }
+  }
 
   return (
     <div className="sheet">
@@ -43,7 +64,12 @@ export default function Shell() {
             <div className="sub">Digital Twin // Fleet Ops Dashboard</div>
           </div>
         </div>
-        <div className="status">
+        <div className="status" style={{ display: 'flex', alignItems: 'center' }}>
+          {isOperator && (
+            <button className="btn" style={{ marginRight: 16, padding: '4px 8px', fontSize: 11, fontWeight: 'bold', borderColor: 'var(--signal)', color: 'var(--signal)' }} onClick={handleReset}>
+              RESET SCENARIO
+            </button>
+          )}
           <span className="mono-sm" style={{ marginRight: 12 }}>
             T={ts}s &nbsp; sync={fleetSync}
           </span>
