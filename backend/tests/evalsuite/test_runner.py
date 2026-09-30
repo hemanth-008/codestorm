@@ -26,3 +26,10 @@ def test_run_suite_fast_completes_within_fifteen_seconds() -> None:
     assert result.rows
     assert elapsed < 15.0
 
+
+def test_seed_one_noise_timing_uses_zero_second_injection_start() -> None:
+    result = run_suite(seed=1, fast=True)
+    noise = next(row for row in result.rows if row.scenario == "noise_1m")
+
+    assert noise.time_to_detect_s is not None
+    assert 0.0 < noise.time_to_detect_s <= 5.0

@@ -172,9 +172,11 @@ def _rul_error_pct(seed: int) -> float:
     errors: list[float] = []
     slope = 0.9 / ((len(packets) - 1) * DT)
     for index, packet in enumerate(packets):
+        # The known ramp is used only to score this report. The estimator
+        # receives telemetry and twin state, never this wear value.
         report = estimator.update(packet, _twin(packet, 0.0, None))
         wear = 0.9 * index / (len(packets) - 1)
-        if wear >= 0.3 and report.rul_s is not None:
+        if report.health_index < 0.7 and report.rul_s is not None:
             truth = (1.0 - wear) / slope
             errors.append(abs(report.rul_s - truth) / max(truth, 1.0) * 100.0)
     return max(errors) if errors else 100.0

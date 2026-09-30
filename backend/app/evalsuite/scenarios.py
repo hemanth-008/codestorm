@@ -20,9 +20,9 @@ def scenarios(*, fast: bool = True) -> list[Scenario]:
     duration = 20.0 if fast else 60.0
     return [
         Scenario("clean_baseline", "clean", 0.0, duration),
-        Scenario("noise_1m", "noise", 1.0, duration),
-        Scenario("noise_2m", "noise", 2.0, duration),
-        Scenario("noise_4m", "noise", 4.0, duration),
+        Scenario("noise_1m", "noise", 1.0, duration, attack_start_s=0.0),
+        Scenario("noise_2m", "noise", 2.0, duration, attack_start_s=0.0),
+        Scenario("noise_4m", "noise", 4.0, duration, attack_start_s=0.0),
         Scenario("dropout_2s", "dropout", 2.0, duration),
         Scenario("dropout_5s", "dropout", 5.0, duration),
         Scenario("dropout_10s", "dropout", 10.0, duration),
@@ -31,4 +31,3 @@ def scenarios(*, fast: bool = True) -> list[Scenario]:
         Scenario("spoof_drift_0_5mps", "spoof_drift", 0.5, duration),
         Scenario("spoof_battery_10pct", "spoof_battery", 10.0, duration),
     ]
-
