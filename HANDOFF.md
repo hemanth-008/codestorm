@@ -22,3 +22,11 @@ Shared log. Each lane appends only under its own heading: blockers, contract que
 - D6 alert rules were not run through `promtool` because it is not installed in this worktree; backend metric tests pass and the rule inputs are exposed at `/metrics`.
 
 ## Hemanth
+
+## Lane A Notes
+- In auto-recharge, I used \kind="override"\ for the event because \echarge_started\ is not in the contract schema.
+
+
+## Lane A Notes
+- Verified Lane B's eval harness fix: 5s/10s dropouts meet the <6m max position error and recover sync immediately.
+
