@@ -13,6 +13,7 @@ class _SpoofState:
     previous: Telemetry | None = None
     active: bool = False
     duplicate_count: int = 0
+    residual_streak: int = 0
     last_event_ts: float | None = None
 
 
@@ -40,6 +41,15 @@ class SpoofGuard:
         """Inspect one packet and its twin residual for spoof indicators."""
         state = self._states.setdefault(tel.robot_id, _SpoofState())
         reasons, metrics = self._indicators(tel, twin, state.previous)
+        if twin.residual_pos > self.residual_threshold_m:
+            state.residual_streak += 1
+        else:
+            state.residual_streak = 0
+        if "twin_residual" in reasons:
+            kinematic_spike = bool(metrics.get("kinematic_spike", False))
+            hard_jump = twin.residual_pos > 8.0
+            if not hard_jump and (kinematic_spike or state.residual_streak < 4):
+                reasons.remove("twin_residual")
         state.previous = tel
         if not reasons:
             state.active = False
@@ -81,12 +91,19 @@ class SpoofGuard:
             acceleration_mps2=acceleration,
             yaw_rate_rps=yaw_rate,
         )
-        if implied_speed > limits["vmax"] * 1.5 or abs(implied_speed - abs(tel.speed)) > max(1.0, limits["vmax"] * 0.75):
+        kinematic_spike = (
+            implied_speed > limits["vmax"] * 1.5
+            or abs(implied_speed - abs(tel.speed)) > max(1.0, limits["vmax"] * 0.75)
+            or acceleration > limits["amax"] * 1.5
+            or yaw_rate > limits["wmax"] * 1.5
+        )
+        metrics["kinematic_spike"] = kinematic_spike
+        # A single noisy position sample can imply an impossible velocity;
+        # require the twin verifier to agree before calling that spoof.  The
+        # large residual preserves first-packet jump detection while allowing
+        # NoiseMonitor to own sigma-level sensor noise.
+        if kinematic_spike and twin.residual_pos > 8.0:
             reasons.append("implied_speed_mismatch")
-        if acceleration > limits["amax"] * 1.5:
-            reasons.append("acceleration_limit")
-        if yaw_rate > limits["wmax"] * 1.5:
-            reasons.append("yaw_limit")
 
         battery_delta = tel.battery - previous.battery
         metrics["battery_delta_pct"] = battery_delta
@@ -138,4 +155,3 @@ class SpoofGuard:
 def _angle_delta(current: float, previous: float) -> float:
     """Return the shortest signed heading difference in radians."""
     return (current - previous + math.pi) % (2.0 * math.pi) - math.pi
-

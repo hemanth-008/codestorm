@@ -34,7 +34,7 @@ def _twin(ts: float, residual: float, robot_id: str = "R1") -> TwinState:
 
 
 def test_noise_high_rises_with_one_meter_residual_noise_and_clears() -> None:
-    monitor = NoiseMonitor(window_size=25, min_samples=5, variance_threshold_m2=0.4)
+    monitor = NoiseMonitor(window_size=25, min_samples=5, variance_threshold_m2=0.25)
     rng = random.Random(42)
     events = []
     for index in range(25):
@@ -53,3 +53,10 @@ def test_constant_clean_residuals_do_not_raise_noise() -> None:
         events.extend(monitor.update(_twin(index * 0.2, 0.1)))
     assert events == []
 
+
+def test_linear_residual_drift_is_not_mislabeled_as_noise() -> None:
+    monitor = NoiseMonitor(window_size=25, min_samples=5, variance_threshold_m2=0.4)
+    events = []
+    for index in range(40):
+        events.extend(monitor.update(_twin(index * 0.2, 0.1 * index)))
+    assert events == []

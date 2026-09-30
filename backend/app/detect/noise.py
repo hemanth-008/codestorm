@@ -19,8 +19,10 @@ class NoiseMonitor:
     """Detect high measurement noise from a rolling twin residual window.
 
     The monitor computes population variance
-    ``sum((r - mean(r))**2) / n`` over the last ``window_size`` residual
-    magnitudes.  A rising ``noise_high`` edge is emitted above the configured
+    ``sum((r - trend(r))**2) / n`` over the last ``window_size`` residual
+    magnitudes, where ``trend`` is a least-squares linear trend.  Removing a
+    persistent slope prevents spoof drift from being mislabeled as white
+    sensor noise.  A rising ``noise_high`` edge is emitted above the configured
     variance threshold, and ``noise_cleared`` is emitted after the window falls
     back below it.
     """
@@ -29,7 +31,7 @@ class NoiseMonitor:
         self,
         *,
         window_size: int = 25,
-        variance_threshold_m2: float = 0.4,
+        variance_threshold_m2: float = 0.25,
         min_samples: int = 5,
         cooldown_s: float = 5.0,
     ) -> None:
@@ -56,7 +58,7 @@ class NoiseMonitor:
         state.residuals.append(float(twin.residual_pos))
         if len(state.residuals) < self.min_samples:
             return []
-        variance = statistics.pvariance(state.residuals)
+        variance = _detrended_variance(state.residuals)
         high = variance > self.variance_threshold_m2
         detail = {
             "variance_m2": variance,
@@ -97,3 +99,20 @@ class NoiseMonitor:
             )
         ]
 
+
+def _detrended_variance(values: deque[float]) -> float:
+    """Return residual variance after removing a least-squares linear trend."""
+    samples = list(values)
+    if len(samples) < 2:
+        return 0.0
+    mean_x = (len(samples) - 1) / 2.0
+    mean_y = statistics.fmean(samples)
+    denominator = sum((index - mean_x) ** 2 for index in range(len(samples)))
+    slope = (
+        sum((index - mean_x) * (value - mean_y) for index, value in enumerate(samples)) / denominator
+        if denominator
+        else 0.0
+    )
+    intercept = mean_y - slope * mean_x
+    residuals = [value - (intercept + slope * index) for index, value in enumerate(samples)]
+    return statistics.pvariance(residuals)
