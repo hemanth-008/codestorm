@@ -105,6 +105,26 @@ class TestGroundTruth:
         sim = FleetSim(seed=42)
         gt = sim.ground_truth("R1")
         assert gt.attack_active is None
+        
+class TestAutoRecharge:
+    def test_auto_recharge(self):
+        sim = FleetSim(seed=42)
+        # Drain the battery manually to < 30
+        sim._robots["R1"].state.battery = 29.0
+        # Fast forward simulation to let it loop and recharge
+        recharge_started = False
+        recharge_finished = False
+        for _ in range(3000): # 10 mins
+            sim.step()
+            for evt in sim.events:
+                if evt.kind == "override" and evt.robot_id == "R1" and "auto-recharging" in evt.message:
+                    recharge_started = True
+            sim.events.clear()
+            if recharge_started and sim._robots["R1"].state.battery == 100.0:
+                recharge_finished = True
+                break
+        assert recharge_started
+        assert recharge_finished
 
 
 class TestMissions:

@@ -59,6 +59,13 @@ async def sim_loop() -> None:
             except Exception as e:
                 print(f"Error ticking twins: {e}")
 
+            if len(pipeline.last_health) > 0 and len(pipeline.last_health) == len(sim.missions()):
+                if all(h.status == "critical" for h in pipeline.last_health.values()):
+                    print("All robots critical. Scheduling automatic reset...")
+                    from app.api.endpoints import reset_sim
+                    reset_sim(42)
+                    continue
+
             elapsed = time.perf_counter() - t0
             target_sleep = (DT / SIM_SPEED) - elapsed
             if target_sleep > 0:

@@ -150,11 +150,12 @@ def _default_starts() -> dict[str, StateVec]:
     }
 
 
-# Wear rates tuned so R1 fails ~12 min, D1 ~15 min, G1 ~20 min
+# Wear rates tuned so R1 reaches watch at ~12 min (fails at 40 min),
+# D1 and G1 stay OK for >20 min (fail at 80 and 100 min respectively).
 _DEFAULT_WEAR_RATES: dict[str, float] = {
-    "R1": 1.0 / (12 * 60),   # ≈ 0.001389/s
-    "D1": 1.0 / (15 * 60),   # ≈ 0.001111/s
-    "G1": 1.0 / (20 * 60),   # ≈ 0.000833/s
+    "R1": 1.0 / (40 * 60),
+    "D1": 1.0 / (80 * 60),
+    "G1": 1.0 / (100 * 60),
 }
 
 _ROBOT_TYPES: dict[str, RobotType] = {
@@ -218,50 +219,51 @@ class FleetSim:
         packets: list[Telemetry] = []
 
         for rs in self._robots.values():
-            # --- Auto-recharge ---
+            # --- Wear ---
+            if rs.wear < FAILURE_WEAR and rs.recharge_remaining_s <= 0:
+                rs.wear += rs.wear_rate * dt
+                rs.wear = min(rs.wear, FAILURE_WEAR)
+
+            # --- Control ---
+            cmd = Command(speed=0.0, yaw_rate=0.0)
             if rs.recharge_remaining_s > 0:
-                rs.recharge_remaining_s -= dt
-                rs.state.battery += (100.0 / 20.0) * dt
-                rs.state.battery = min(100.0, rs.state.battery)
-                cmd = Command(speed=0.0, yaw_rate=0.0)
-                if rs.recharge_remaining_s <= 0:
-                    rs.recharge_remaining_s = 0.0
-                    rs.state.battery = 100.0
-            else:
-                # --- Wear ---
-                if rs.wear < FAILURE_WEAR:
-                    rs.wear += rs.wear_rate * dt
-                    rs.wear = min(rs.wear, FAILURE_WEAR)
-    
-                # --- Control ---
-                cmd = Command(speed=0.0, yaw_rate=0.0)
-                if rs.mission and rs.wear < FAILURE_WEAR:
-                    old_idx = rs.wp_idx
-                    cmd, rs.wp_idx, _done = follow(
-                        rs.state, rs.mission.waypoints, rs.wp_idx,
-                        rs.mission.cruise_speed, rs.robot_type,
-                    )
-                    
-                    if old_idx == 0 and rs.wp_idx == 1 and rs.state.battery < 30.0:
-                        rs.recharge_remaining_s = 20.0
-                        cmd = Command(speed=0.0, yaw_rate=0.0)
-                        self.events.append(Event(
-                            id=str(uuid.uuid4()),
-                            ts=self.now,
-                            robot_id=rs.robot_id,
-                            kind="recharge_started",
-                            severity="info",
-                            message=f"Battery low ({rs.state.battery:.1f}%), auto-recharging at base."
-                        ))
-    
-                    if _done and rs.mission.loop:
-                        rs.wp_idx = 0
+                pass # speed 0 command
+            elif rs.mission and rs.wear < FAILURE_WEAR:
+                old_idx = rs.wp_idx
+                cmd, rs.wp_idx, _done = follow(
+                    rs.state, rs.mission.waypoints, rs.wp_idx,
+                    rs.mission.cruise_speed, rs.robot_type,
+                )
+                
+                if old_idx == 0 and rs.wp_idx == 1 and rs.state.battery < 30.0:
+                    rs.recharge_remaining_s = 20.0
+                    cmd = Command(speed=0.0, yaw_rate=0.0)
+                    self.events.append(Event(
+                        id=str(uuid.uuid4()),
+                        ts=self.now,
+                        robot_id=rs.robot_id,
+                        kind="override",
+                        severity="info",
+                        message=f"Battery low ({rs.state.battery:.1f}%), auto-recharging at base."
+                    ))
+
+                if _done and rs.mission.loop:
+                    rs.wp_idx = 0
 
             # Obstacle avoidance
             cmd = _swerve_command(rs.state, cmd, self._obstacles, rs.robot_type)
 
             # --- Step the physics ---
             rs.state = rs.model.step(rs.state, cmd, dt, wear=rs.wear, rng=rs.rng)
+
+            # --- Auto-recharge battery override ---
+            if rs.recharge_remaining_s > 0:
+                rs.recharge_remaining_s -= dt
+                rs.state.battery += (100.0 / 20.0) * dt
+                rs.state.battery = min(100.0, rs.state.battery)
+                if rs.recharge_remaining_s <= 0:
+                    rs.recharge_remaining_s = 0.0
+                    rs.state.battery = 100.0
 
             # Clamp to arena
             rs.state = rs.state.model_copy(update={
