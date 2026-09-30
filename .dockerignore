@@ -1,0 +1,21 @@
+.git
+.github
+.codex
+.agents
+__pycache__
+*.py[cod]
+*.egg-info
+.pytest_cache
+.venv
+venv
+node_modules
+frontend/dist
+*.db
+*.sqlite
+*.sqlite3
+.env
+.env.*
+! .env.example
+secrets/
+datasets/
+artifacts/
