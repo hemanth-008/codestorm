@@ -1,122 +1,108 @@
+"""Main FastAPI application and entry point."""
+import asyncio
+import os
+import time
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-import math, time
+from contextlib import asynccontextmanager
 
-app = FastAPI()
+from app.core.db import init_db
+from app.api.endpoints import router as api_router
+from app.sim.world import FleetSim
+from app.contract.physics import DT
+
+# Global sim reference so the API can reach it for inject/clear/missions
+import backend_sim_global
+backend_sim_global.fleet_sim = FleetSim(seed=42)
+
+SIM_ENABLED = int(os.environ.get("SIM_ENABLED", "1"))
+SIM_SPEED = float(os.environ.get("SIM_SPEED", "1.0"))
+CORS_ORIGINS = os.environ.get("CORS_ORIGINS", "*").split(",")
+
+
+async def sim_loop() -> None:
+    try:
+        from app.core.pipeline import pipeline
+        await asyncio.sleep(1.0)
+
+        sim = backend_sim_global.fleet_sim
+
+        # Seed twin engines with the default missions so the twin predictor
+        # can use follow() from the start.
+        for rid, mission in sim.missions().items():
+            pipeline.init_robot(rid, mission.robot_id[0].upper() == "D" and "drone"
+                                or (mission.robot_id[0].upper() == "G" and "agv" or "rover"))
+            # Determine robot type from the sim internals
+            rtype = sim._robots[rid].robot_type
+            pipeline.init_robot(rid, rtype)
+            pipeline.twins[rid].set_mission(mission)
+
+        while True:
+            t0 = time.perf_counter()
+
+            packets = sim.step(DT)
+
+            for tel in packets:
+                try:
+                    await pipeline.process_telemetry(tel)
+                except Exception as e:
+                    print(f"Error processing sim telemetry: {e}")
+
+            try:
+                await pipeline.tick_twins(sim.now)
+            except Exception as e:
+                print(f"Error ticking twins: {e}")
+
+            elapsed = time.perf_counter() - t0
+            target_sleep = (DT / SIM_SPEED) - elapsed
+            if target_sleep > 0:
+                await asyncio.sleep(target_sleep)
+            else:
+                await asyncio.sleep(0.001)
+    except asyncio.CancelledError:
+        print("Simulator loop gracefully shutting down.")
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    init_db()
+
+    task = None
+    if SIM_ENABLED:
+        task = asyncio.create_task(sim_loop())
+
+    yield
+
+    if task:
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
+
+
+app = FastAPI(lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=CORS_ORIGINS,
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-WAYPOINTS = [(10, 10), (90, 10), (90, 50), (50, 50), (50, 90), (10, 90)]
-CRUISE = 4.0
+app.include_router(api_router)
 
-SEGMENTS = []
-total = 0.0
-for i, (x1, y1) in enumerate(WAYPOINTS):
-    x2, y2 = WAYPOINTS[(i + 1) % len(WAYPOINTS)]
-    length = math.hypot(x2 - x1, y2 - y1)
-    SEGMENTS.append((x1, y1, x2, y2, length, total))
-    total += length
-PERIMETER = total
+# --- Optional Lane D: security and observability ---
+try:
+    from app.security.install import install as install_security  # type: ignore[import-not-found]
+    install_security(app)
+except ImportError:
+    pass  # Lane D not merged yet
 
-
-def robot_state(t):
-    d = (t * CRUISE) % PERIMETER
-    for x1, y1, x2, y2, length, start in SEGMENTS:
-        if d <= start + length:
-            f = (d - start) / length
-            x = x1 + (x2 - x1) * f
-            y = y1 + (y2 - y1) * f
-            heading = math.degrees(math.atan2(y2 - y1, x2 - x1)) % 360
-            return x, y, heading
-    return WAYPOINTS[0][0], WAYPOINTS[0][1], 0.0
-
-
-# ---- Decision engine: state in, {action, reason, confidence} out ----
-# Swap this function's body for any other PS: network load, energy demand,
-# sensor readings - the shape (state -> action + reason) stays the same.
-def decide(battery, speed):
-    if battery < 30:
-        return {
-            "action": "RETURN_TO_BASE",
-            "reason": f"Battery at {battery:.0f}% is below the 30% safety threshold",
-            "confidence": round(0.95 - (battery / 300), 2),
-        }
-    if speed > 1.6:
-        return {
-            "action": "SLOW_DOWN",
-            "reason": f"Speed {speed:.2f} m/s exceeds the 1.6 m/s safe operating limit",
-            "confidence": 0.82,
-        }
-    return {
-        "action": "CONTINUE",
-        "reason": "Battery and speed are within safe operating range",
-        "confidence": 0.9,
-    }
-
-
-# Manual override, kept in memory. A real system would persist this.
-_override = {"action": None, "reason": None, "until": 0}
-
-
-class Override(BaseModel):
-    action: str
-    reason: str
-    seconds: int = 15
-
-
-@app.get("/api/health")
-def health():
-    return {"status": "ok", "time": time.time()}
-
-
-@app.get("/api/telemetry")
-def telemetry():
-    t = time.time()
-    x, y, heading = robot_state(t)
-    battery = 100 - ((t / 6) % 75)
-    speed = 1.2 + 0.3 * math.sin(t / 2)
-    return {
-        "x": round(x, 2),
-        "y": round(y, 2),
-        "battery": round(battery, 1),
-        "speed": round(speed, 2),
-        "heading": round(heading),
-        "status": "LOW BATTERY" if battery < 30 else "NAVIGATING",
-        "time": t,
-    }
-
-
-@app.get("/api/decision")
-def decision():
-    t = time.time()
-    _, _, _ = robot_state(t)
-    battery = 100 - ((t / 6) % 75)
-    speed = 1.2 + 0.3 * math.sin(t / 2)
-
-    if _override["action"] and t < _override["until"]:
-        result = {
-            "action": _override["action"],
-            "reason": _override["reason"],
-            "confidence": 1.0,
-            "source": "MANUAL OVERRIDE",
-        }
-    else:
-        result = decide(battery, speed)
-        result["source"] = "AUTONOMOUS"
-
-    result["time"] = t
-    return result
-
-
-@app.post("/api/override")
-def override(o: Override):
-    _override["action"] = o.action
-    _override["reason"] = o.reason
-    _override["until"] = time.time() + o.seconds
-    return {"ok": True}
+try:
+    from app.observability.install import install as install_obs  # type: ignore[import-not-found]
+    install_obs(app)
+except ImportError:
+    pass  # Lane D not merged yet

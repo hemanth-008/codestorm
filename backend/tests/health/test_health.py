@@ -4,7 +4,7 @@ from __future__ import annotations
 from app.contract.physics import DT
 from app.contract.schemas import StateVec, TwinState
 from app.health.health import HealthEstimator
-from fixtures import clean_stream, wear_ramp_stream
+from tests.fixtures import clean_stream, wear_ramp_stream
 
 
 def _twin(packet) -> TwinState:
