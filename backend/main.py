@@ -50,6 +50,10 @@ async def sim_loop() -> None:
 
             for tel in packets:
                 try:
+                    if os.environ.get("TELEMETRY_KEY"):
+                        from app.security.signing import sign_telemetry
+                        sig = sign_telemetry(tel, os.environ.get("TELEMETRY_KEY"))
+                        tel = tel.model_copy(update={"sig": sig})
                     await pipeline.process_telemetry(tel)
                 except Exception as e:
                     print(f"Error processing sim telemetry: {e}")

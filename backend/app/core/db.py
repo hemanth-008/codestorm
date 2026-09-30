@@ -82,7 +82,7 @@ def insert_twin_state(state: TwinState):
 def insert_event(evt: Event):
     cur = conn.cursor()
     cur.execute(
-        "INSERT INTO events (event_id, robot_id, ts, kind, severity, data) VALUES (?, ?, ?, ?, ?, ?)",
+        "INSERT OR IGNORE INTO events (event_id, robot_id, ts, kind, severity, data) VALUES (?, ?, ?, ?, ?, ?)",
         (evt.id, evt.robot_id, evt.ts, evt.kind, evt.severity, evt.model_dump_json())
     )
     conn.commit()

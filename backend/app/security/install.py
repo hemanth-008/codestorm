@@ -51,6 +51,8 @@ class SecurityMiddleware(BaseHTTPMiddleware):
         public = {
             "/api/auth/login",
             "/api/health",
+            "/api/stream",
+            "/api/telemetry",
             "/health",
             "/metrics",
         }
