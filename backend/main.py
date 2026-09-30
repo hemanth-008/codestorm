@@ -76,6 +76,13 @@ async def sim_loop() -> None:
         print("Simulator loop gracefully shutting down.")
 
 
+def _prewarm_eval():
+    from app.evalsuite import run_suite
+    from app.api import endpoints
+    import time
+    res = run_suite(seed=1, fast=True)
+    endpoints._last_eval = res.model_copy(update={"ts": time.time()})
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
@@ -83,6 +90,9 @@ async def lifespan(app: FastAPI):
     task = None
     if SIM_ENABLED:
         task = asyncio.create_task(sim_loop())
+        
+    loop = asyncio.get_running_loop()
+    loop.run_in_executor(None, _prewarm_eval)
 
     yield
 

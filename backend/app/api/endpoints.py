@@ -214,12 +214,12 @@ def deploy_mission_endpoint(mission: Mission, force: int = Query(0)):
 
 # ---------------------------------------------------------------------------
 # Eval suite
-# ---------------------------------------------------------------------------
 @router.post("/eval/run")
-def run_eval(seed: int = Query(42)):
+async def run_eval(seed: int = Query(42)):
     global _last_eval
+    loop = asyncio.get_running_loop()
     t0 = time.perf_counter()
-    result = _run_suite(seed=seed, fast=True)
+    result = await loop.run_in_executor(None, lambda: _run_suite(seed=seed, fast=True))
     elapsed = time.perf_counter() - t0
     # Stamp with wall time
     result = result.model_copy(update={"ts": time.time()})
