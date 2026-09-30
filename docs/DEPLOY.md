@@ -7,31 +7,52 @@ store, never in Git.
 
 ## Render
 
-1. Create a new Render Blueprint from `render.yaml`.
-2. Set the generated backend `JWT_SECRET` and `TELEMETRY_KEY` values in the
-   service Environment page. Set `AUTH_ENABLED=1` only after operator and
-   viewer credentials are configured.
-3. Confirm the backend health check is green at
-   `https://<backend>.onrender.com/health` and inspect
+1. Create a new Render Blueprint from `render.yaml`, or create the backend
+   web service with `cd backend && uvicorn main:app --host 0.0.0.0 --port $PORT`.
+2. For Eval 3, set these exact backend service environment variables in Render
+   (Production values; do not commit the secret values):
+
+   | Variable | Eval 3 value |
+   | --- | --- |
+   | `AUTH_ENABLED` | `1` |
+   | `SIM_ENABLED` | `1` after the simulator signs packets; otherwise `0` while using signed external ingest |
+   | `SIM_SPEED` | `1.0` |
+   | `CORS_ORIGINS` | `https://<vercel-project>.vercel.app` (no trailing slash) |
+   | `JWT_SECRET` | a generated random secret, at least 32 characters |
+   | `TELEMETRY_KEY` | the HMAC key shared with the signed telemetry producer |
+   | `AUTH_OPERATOR_PASSWORD` | a strong operator password used for writes/overrides |
+   | `AUTH_VIEWER_PASSWORD` | a strong viewer password used for read-only access |
+   | `RATE_LIMIT` | `120` |
+   | `RATE_LIMIT_WINDOW_S` | `60` |
+
+   `JWT_SECRET` signs login tokens; `TELEMETRY_KEY` signs the contract
+   telemetry string. They may be different secrets. The current merged
+   `FleetSim` creates `sig=None`, so enabling `TELEMETRY_KEY` before the Lane A
+   simulator signer is merged will intentionally drop simulator packets; use
+   `SIM_ENABLED=0` for signed external packets or merge the signer first.
+3. Confirm the backend health check at
+   `https://<backend>.onrender.com/health` and metrics at
    `https://<backend>.onrender.com/metrics`.
-4. Update `CORS_ORIGINS` and the frontend `VITE_API_URL` if Render assigns
-   different service names or a custom domain.
-5. Render free services can sleep. The scheduled GitHub workflow pings the
+4. Render free services can sleep. The scheduled GitHub workflow pings the
    configured `RENDER_HEALTH_URL` every ten minutes.
 
 ## Vercel frontend
 
 Import the repository into Vercel, set the project root to `frontend`, and use
-the default Vite build (`npm run build`, output `dist`). Set:
+the default Vite build (`npm run build`, output `dist`). In Project Settings →
+Environment Variables, set these exact variables for both Production and
+Preview (use the Production backend URL for Eval 3):
 
 ```text
 VITE_USE_MOCK=0
-VITE_API_URL=https://<backend-host>
+VITE_API_URL=https://<backend>.onrender.com
 ```
 
-Add the Vercel origin to the backend `CORS_ORIGINS` value. Deploy the backend
-on Render, Docker, or Kubernetes separately; Vercel does not run the FastAPI
-process.
+Replace the two angle-bracket placeholders with the actual project/backend
+hostnames, then set Render `CORS_ORIGINS` to the exact Vercel origin. Deploy the
+backend on Render, Docker, or Kubernetes separately; Vercel does not run the
+FastAPI process. Log in to Eval 3 with the Render-configured operator or viewer
+credentials.
 
 ## Docker Compose
 
