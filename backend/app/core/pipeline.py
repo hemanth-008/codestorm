@@ -36,8 +36,17 @@ except ImportError:
 TELEMETRY_KEY = os.environ.get("TELEMETRY_KEY")
 
 
+MAX_STREAM_EVENTS = 200  # backpressure: drop oldest events if stream buffer exceeds this
+
+
 class Pipeline:
-    """Central pipeline: signature → twin → detectors → health → decision."""
+    """Central pipeline: signature → twin → detectors → health → decision.
+
+    Hardening: malformed packets are dropped with a counter increment,
+    the stream event buffer is bounded by MAX_STREAM_EVENTS, and
+    each detector/health step is wrapped so a single failure does not
+    crash the pipeline.
+    """
 
     def __init__(self) -> None:
         self.twins: dict[str, TwinEngine] = {}
@@ -76,8 +85,22 @@ class Pipeline:
         self.active_override = override
 
     async def process_telemetry(self, tel: Telemetry) -> None:
+        """Ingest one telemetry packet through the full pipeline.
+
+        Malformed or unexpected packets increment the drop counter rather
+        than crashing the loop.
+        """
         now = time.time()
         self.msg_count += 1
+
+        # 0. Basic sanity – reject packets with obviously bad fields
+        try:
+            if not tel.robot_id or tel.ts < 0:
+                self.dropped_count += 1
+                return
+        except Exception:
+            self.dropped_count += 1
+            return
 
         # 1. Signature verification (Lane D, optional)
         if TELEMETRY_KEY and verify_telemetry is not None:
@@ -105,15 +128,30 @@ class Pipeline:
                 message="Telemetry link recovered",
             ))
 
-        # 3. Detectors (Lane B)
+        # 3. Detectors (Lane B) — wrapped so one failing detector
+        #    does not crash the entire pipeline.
         events: list[Event] = []
-        events.extend(self.spoof_guards[tel.robot_id].update(tel, twin))
-        events.extend(self.noise_monitors[tel.robot_id].update(twin))
-        events.extend(self.dev_detectors[tel.robot_id].update(twin))
+        for fn in [
+            lambda: self.spoof_guards[tel.robot_id].update(tel, twin),
+            lambda: self.noise_monitors[tel.robot_id].update(twin),
+            lambda: self.dev_detectors[tel.robot_id].update(twin),
+        ]:
+            try:
+                events.extend(fn())
+            except Exception as exc:
+                print(f"Detector error for {tel.robot_id}: {exc}")
 
         # 4. Health (Lane B)
-        health = self.health_estimators[tel.robot_id].update(tel, twin)
-        self.last_health[tel.robot_id] = health
+        try:
+            health = self.health_estimators[tel.robot_id].update(tel, twin)
+            self.last_health[tel.robot_id] = health
+        except Exception as exc:
+            print(f"Health error for {tel.robot_id}: {exc}")
+            health = self.last_health.get(
+                tel.robot_id,
+                HealthReport(robot_id=tel.robot_id, ts=tel.ts,
+                             health_index=1.0, status="ok"),
+            )
 
         # Health events are included in the health estimator output
         # but we also want them in recent_events for the decision engine
@@ -233,8 +271,11 @@ class Pipeline:
         events = self.new_events_for_stream.copy()
         self.new_events_for_stream.clear()
 
+        # Determine sim ts from the latest robot state
+        latest_ts = max((h[-1].ts for h in history_cache.values() if h), default=0.0)
+
         return StreamFrame(
-            ts=time.time(),
+            ts=latest_ts,
             robots=robots,
             events=events,
             fleet_sync=fleet_sync,

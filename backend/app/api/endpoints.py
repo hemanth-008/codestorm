@@ -210,10 +210,3 @@ def latest_eval():
     return _last_eval
 
 
-# ---------------------------------------------------------------------------
-# Auth (stub until Lane D)
-# ---------------------------------------------------------------------------
-@router.post("/auth/login")
-def login():
-    raise HTTPException(status_code=501,
-                        detail="Auth not available until Lane D")
