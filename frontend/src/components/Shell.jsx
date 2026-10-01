@@ -16,6 +16,7 @@ const NAV = [
   { to: '/scorecard', label: 'Scorecard', icon: '▦' },
   { to: '/sandbox', label: 'Sandbox', icon: '△' },
   { to: '/monitor', label: 'Monitor', icon: '▤' },
+  { to: '/maintenance', label: 'Maint.', icon: '⚙' },
   { to: '/login', label: 'Login', icon: '⚿' },
 ];
 

@@ -7,6 +7,7 @@ import Attacks from './pages/Attacks';
 import Scorecard from './pages/Scorecard';
 import Sandbox from './pages/Sandbox';
 import Monitor from './pages/Monitor';
+import Maintenance from './pages/Maintenance';
 import Login from './pages/Login';
 
 export default function App() {
@@ -21,6 +22,7 @@ export default function App() {
             <Route path="scorecard" element={<Scorecard />} />
             <Route path="sandbox" element={<Sandbox />} />
             <Route path="monitor" element={<Monitor />} />
+            <Route path="maintenance" element={<Maintenance />} />
             <Route path="login" element={<Login />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>
