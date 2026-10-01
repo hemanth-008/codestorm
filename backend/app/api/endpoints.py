@@ -63,9 +63,23 @@ def get_robot(robot_id: str):
     rframe = next((r for r in frame.robots if r.robot_id == robot_id), None)
     if not rframe:
         raise HTTPException(status_code=404, detail="Robot not found")
+
+    # Flatten TwinState history: promote est.* fields to the top level
+    # so frontend charts can plot h.battery, h.motor_temp etc. directly
+    # instead of h.est.battery (which caused the "flat chart" bug).
+    raw_history = list(history_cache.get(robot_id, []))
+    flat_history = []
+    for ts in raw_history:
+        d = ts.model_dump()
+        est = d.pop("est", {})
+        pred = d.pop("pred", {})
+        d.update(est)
+        d["pred"] = pred
+        flat_history.append(d)
+
     return {
         "frame": rframe,
-        "history": list(history_cache.get(robot_id, [])),
+        "history": flat_history,
         "events": [e for e in events_cache if e.robot_id in (robot_id, None)],
     }
 

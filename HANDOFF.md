@@ -29,4 +29,5 @@ Shared log. Each lane appends only under its own heading: blockers, contract que
 
 ## Lane A Notes
 - Verified Lane B's eval harness fix: 5s/10s dropouts meet the <6m max position error and recover sync immediately.
+- Eval 4 flat-chart root cause: GET /api/robots/{id} history returned raw TwinState where sensor values were nested in `est.battery`, `est.motor_temp` etc. Frontend charts expected top-level `battery`, `motor_temp` fields so plotted undefined as flat line. Fix: endpoint now flattens `est.*` to top level.
 
