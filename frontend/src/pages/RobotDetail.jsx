@@ -27,13 +27,13 @@ export default function RobotDetail() {
         const h = next[r.robot_id] || [];
         const point = {
           t: r.ts,
-          residual_pos: r.twin.residual_pos,
-          est_battery: r.twin.est.battery,
-          pred_battery: r.twin.pred.battery,
-          est_temp: r.twin.est.motor_temp,
-          pred_temp: r.twin.pred.motor_temp,
-          est_vib: r.twin.est.vibration,
-          pred_vib: r.twin.pred.vibration,
+          residual_pos: r.twin.residual_pos || 0,
+          est_battery: r.twin.est?.battery ?? r.telemetry.battery,
+          pred_battery: r.twin.pred?.battery, // might be undefined, that's ok
+          est_temp: r.twin.est?.motor_temp ?? r.telemetry.motor_temp,
+          pred_temp: r.twin.pred?.motor_temp,
+          est_vib: r.twin.est?.vibration ?? r.telemetry.vibration,
+          pred_vib: r.twin.pred?.vibration,
         };
         next[r.robot_id] = [...h, point].slice(-60); // Keep last 12s at 5Hz
       }
