@@ -56,10 +56,18 @@ credentials.
 
 ## Docker Compose
 
-From the repository root:
+From the repository root, build either image directly:
 
 ```powershell
-docker compose up --build
+docker build -f backend/Dockerfile -t fleettwin-backend:lane-ops .
+docker build -f frontend/Dockerfile -t fleettwin-frontend:lane-ops .
+```
+
+Or build and start the complete Compose stack:
+
+```powershell
+docker compose up -d --build
+docker compose ps
 ```
 
 The dashboard is at `http://localhost:8080`, the backend at
@@ -73,6 +81,35 @@ docker compose --profile redis up --build
 
 Redis is an optional deployment building block; the default process-local
 limiter and cache do not require it.
+
+To verify the service-to-service network and then clean up:
+
+```powershell
+docker compose exec -T backend python -c "import urllib.request; r=urllib.request.urlopen('http://backend:8000/health', timeout=5); print(r.status)"
+docker compose exec -T backend python -c "import urllib.request; r=urllib.request.urlopen('http://frontend/', timeout=5); print(r.status)"
+docker compose down
+```
+
+## Level 4 verification status
+
+Verified locally on 2026-10-01 from `lane-ops`:
+
+| Item | Status | Evidence |
+| --- | --- | --- |
+| Backend Docker image | tested | `docker build -f backend/Dockerfile -t fleettwin-backend:lane-ops .` passed |
+| Frontend Docker image | tested | `docker build -f frontend/Dockerfile -t fleettwin-frontend:lane-ops .` passed |
+| Docker Compose startup | tested | `docker compose up -d --build`; backend and frontend reported healthy |
+| Compose backend network check | tested | `http://backend:8000/health` returned HTTP 200 |
+| Compose frontend network check | tested | `http://frontend/` returned HTTP 200 |
+| Kubernetes manifests | validated-only | kubeconform: 8 resources, 6 files, 0 invalid, 0 errors |
+| Kubernetes live apply | not live-tested | no kind/minikube binary or live cluster configured |
+| Prometheus alert rules | not promtool-tested | `promtool` is not installed locally |
+
+The exact non-cluster Kubernetes validation command used was:
+
+```powershell
+docker run --rm -v C:\dev\ft-ops\k8s:/work:ro ghcr.io/yannh/kubeconform:latest -strict -summary /work
+```
 
 ## Kubernetes
 
