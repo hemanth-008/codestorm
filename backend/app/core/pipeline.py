@@ -163,6 +163,7 @@ class Pipeline:
         try:
             health = self.health_estimators[tel.robot_id].update(tel, twin)
             self.last_health[tel.robot_id] = health
+            events.extend(self.health_estimators[tel.robot_id].drain_events())
         except Exception as exc:
             print(f"Health error for {tel.robot_id}: {exc}")
             health = self.last_health.get(
