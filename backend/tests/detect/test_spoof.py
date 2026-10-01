@@ -65,6 +65,19 @@ def test_jump_is_detected_on_first_attacked_packet() -> None:
     assert index <= 21
 
 
+def test_spoof_alert_ids_do_not_collide_across_runs() -> None:
+    packets = spoof_stream("spoof_jump", steps=100, magnitude=15.0, start_s=4.0, duration_s=10.0)
+    first_guard = SpoofGuard()
+    second_guard = SpoofGuard()
+    first_guard.update(packets[19], _twin(packets[19]))
+    second_guard.update(packets[19], _twin(packets[19]))
+    packet = packets[20]
+    first = first_guard.update(packet, _twin(packet, residual_pos=15.0))[0]
+    second = second_guard.update(packet, _twin(packet, residual_pos=15.0))[0]
+
+    assert first.id != second.id
+
+
 def test_battery_offset_is_detected_within_two_seconds() -> None:
     _, ts = _first_event("spoof_battery", magnitude=10.0)
     assert ts <= 6.0

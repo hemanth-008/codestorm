@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import math
+import uuid
 from dataclasses import dataclass
 
 from app.contract.physics import LIMITS, expected_drain_pct_per_s
@@ -159,7 +160,7 @@ class SpoofGuard:
         detail = {"reasons": reasons, **metrics}
         return [
             Event(
-                id=f"spoof_suspected:{tel.robot_id}:{tel.ts:.3f}",
+                id=f"spoof_suspected:{tel.robot_id}:{tel.ts:.3f}:{uuid.uuid4().hex}",
                 ts=tel.ts,
                 robot_id=tel.robot_id,
                 kind="spoof_suspected",
