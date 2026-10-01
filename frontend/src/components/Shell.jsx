@@ -8,6 +8,7 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useFleet } from '../context/FleetProvider';
 import { resetSim, getToken, clearToken } from '../api';
+import NotificationBell from './NotificationBell';
 
 const NAV = [
   { to: '/', label: 'Fleet', icon: '◉' },
@@ -83,7 +84,8 @@ export default function Shell() {
               RESET SCENARIO
             </button>
           )}
-          <span className="mono-sm" style={{ marginRight: 12 }}>
+          <NotificationBell />
+          <span className="mono-sm" style={{ marginRight: 12, marginLeft: 16 }}>
             T={ts}s &nbsp; sync={fleetSync}
           </span>
           <span className={connected ? 'dot live' : 'dot'} />

@@ -238,6 +238,7 @@ h1 { font-size: 30px; margin: 0; font-weight: 700; line-height: 1.1; }
 .animated-number { transition: color 0.3s ease; }
 .alert-pulse { animation: alertPulse 1.5s ease-out; }
 @keyframes alertPulse { 0% { background-color: rgba(255, 90, 31, 0.2); } 100% { background-color: transparent; } }
+@keyframes toastSlideIn { 0% { transform: translateX(100%); opacity: 0; } 100% { transform: translateX(0); opacity: 1; } }
 .empty-state, .loading-state, .error-state { padding: 40px 20px; text-align: center; font-family: var(--mono); font-size: 14px; border: 1.5px dashed var(--muted); margin: 20px 0; color: var(--muted); background: rgba(248, 246, 238, 0.5); }
 .error-state { border-color: var(--signal); color: var(--signal); }
 .kpi-value { transition: color 0.3s ease; }
