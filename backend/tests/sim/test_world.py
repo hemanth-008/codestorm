@@ -117,7 +117,7 @@ class TestAutoRecharge:
         for _ in range(3000): # 10 mins
             sim.step()
             for evt in sim.events:
-                if evt.kind == "override" and evt.robot_id == "R1" and "auto-recharging" in evt.message:
+                if evt.kind == "auto_recharge" and evt.robot_id == "R1" and "auto-recharging" in evt.message:
                     recharge_started = True
             sim.events.clear()
             if recharge_started and sim._robots["R1"].state.battery == 100.0:
@@ -157,3 +157,4 @@ class TestPerformance:
             sim.step()
         elapsed = _time.perf_counter() - t0
         assert elapsed < 3.0, f"5 min sim took {elapsed:.2f}s (limit: 3s)"
+

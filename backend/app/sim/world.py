@@ -242,7 +242,7 @@ class FleetSim:
                         id=str(uuid.uuid4()),
                         ts=self.now,
                         robot_id=rs.robot_id,
-                        kind="override",
+                        kind="auto_recharge",
                         severity="info",
                         message=f"Battery low ({rs.state.battery:.1f}%), auto-recharging at base."
                     ))
@@ -352,3 +352,4 @@ class FleetSim:
         )
 
     # ---- Internal ---------------------------------------------------------
+

@@ -27,7 +27,7 @@ EventKind = Literal[
     "noise_high", "noise_cleared",
     "dropout", "link_recovered",
     "health_warning", "maintenance_due",
-    "mission_deployed", "override",
+    "mission_deployed", "override", "auto_recharge",
     "attack_injected", "attack_cleared",
 ]
 
@@ -216,3 +216,4 @@ class EvalResult(BaseModel):
 class Token(BaseModel):
     access_token: str
     role: Literal["operator", "viewer"]
+
