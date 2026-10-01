@@ -26,7 +26,7 @@ EventKind = Literal[
     "spoof_suspected",
     "noise_high", "noise_cleared",
     "dropout", "link_recovered",
-    "health_warning", "maintenance_due",
+    "health_warning", "maintenance_due", "health_critical",
     "mission_deployed", "override", "auto_recharge",
     "attack_injected", "attack_cleared",
 ]

@@ -25,6 +25,7 @@ class _RobotHealthState:
     wear_history: list[tuple[float, float]] = field(default_factory=list)
     warning_active: bool = False
     maintenance_active: bool = False
+    critical_active: bool = False
     last_event_ts: dict[str, float] = field(default_factory=dict)
 
 
@@ -129,6 +130,7 @@ class HealthEstimator:
         """Queue warning/maintenance edges while suppressing repeats."""
         warning = health_index < 0.7
         maintenance = health_index < 0.45
+        critical = health_index < 0.2
         if warning and not state.warning_active:
             event = self._event_if_allowed(
                 state,
@@ -151,8 +153,20 @@ class HealthEstimator:
             )
             if event is not None:
                 self._pending_events.append(event)
+        if critical and not state.critical_active:
+            event = self._event_if_allowed(
+                state,
+                tel,
+                kind="health_critical",
+                severity="critical",
+                message=f"{tel.robot_id} health critical",
+                detail={"health_index": health_index, "status": status, "drivers": drivers},
+            )
+            if event is not None:
+                self._pending_events.append(event)
         state.warning_active = warning
         state.maintenance_active = maintenance
+        state.critical_active = critical
 
     def _event_if_allowed(
         self,

@@ -20,8 +20,10 @@ from app.core.db import history_cache, events_cache
 # Lane B – sandbox and eval suite
 from app.sandbox.simulate import simulate_mission as _simulate_mission
 from app.evalsuite import run_suite as _run_suite
+from app.api.maintenance import router as maintenance_router
 
 router = APIRouter(prefix="/api")
+router.include_router(maintenance_router)
 
 # ---------------------------------------------------------------------------
 # Cached eval result (in-memory, most recent run)
