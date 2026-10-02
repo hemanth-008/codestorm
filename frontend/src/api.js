@@ -213,6 +213,18 @@ export function getHealth() {
   return api('/health');
 }
 
+// ─── Maintenance ────────────────────────────────────────────
+
+/** @returns {Promise<any[]>} Maintenance event log from backend DB */
+export function getMaintenanceLog() {
+  return api('/api/maintenance/log');
+}
+
+/** @returns {Promise<any[]>} Lifetime reference per robot type */
+export function getLifetimeReference() {
+  return api('/api/maintenance/lifetime-reference');
+}
+
 /**
  * Open an SSE connection to the stream endpoint.
  * @returns {EventSource}

@@ -2,24 +2,28 @@
  * Maintenance page (Eval 4, item 2)
  *
  * Top section: model-based lifetime and maintenance interval per robot type.
- * Bottom section: filterable log of maintenance-related events per robot
- * (maintenance_due, health_warning, and relevant critical events).
+ *   - When connected to real backend, fetched from GET /api/maintenance/lifetime-reference
+ *   - Falls back to hardcoded estimates from physics.py wear rates
+ * Bottom section: filterable log of maintenance-related events per robot.
+ *   - When connected to real backend, fetched from GET /api/maintenance/log
+ *   - Falls back to stream events filtered for maintenance kinds
  */
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useFleet } from '../context/FleetProvider';
+import { getMaintenanceLog, getLifetimeReference } from '../api';
 
-// Model-based estimates from physics.py wear rates.
+const USE_MOCK = import.meta.env.VITE_USE_MOCK !== '0';
+
+// Fallback model-based estimates from physics.py wear rates.
 // Wear rises linearly; defaults: R1 ~12 min, D1 ~15 min, G1 ~20 min.
-const TYPE_INFO = [
+const FALLBACK_TYPE_INFO = [
   {
     type: 'rover',
     label: 'Rover',
     id: 'R1',
     icon: '◉',
-    lifetime: '~12 min',
-    lifetimeSec: 720,
-    interval: '~6 min',
-    intervalSec: 360,
+    lifetime: '~40 min',
+    interval: '~22 min',
     desc: 'High wear rate from ground friction and terrain. Maintenance triggered at health index < 0.4.',
   },
   {
@@ -27,10 +31,8 @@ const TYPE_INFO = [
     label: 'Drone',
     id: 'D1',
     icon: '◎',
-    lifetime: '~15 min',
-    lifetimeSec: 900,
-    interval: '~8 min',
-    intervalSec: 480,
+    lifetime: '~80 min',
+    interval: '~44 min',
     desc: 'Moderate wear from rotor stress and wind loading. Battery drain is highest among fleet.',
   },
   {
@@ -38,17 +40,25 @@ const TYPE_INFO = [
     label: 'AGV',
     id: 'G1',
     icon: '▦',
-    lifetime: '~20 min',
-    lifetimeSec: 1200,
-    interval: '~10 min',
-    intervalSec: 600,
+    lifetime: '~100 min',
+    interval: '~55 min',
     desc: 'Lowest wear rate on flat surfaces. Limited yaw rate preserves mechanical components.',
   },
 ];
 
+const TYPE_TO_ID = { rover: 'R1', drone: 'D1', agv: 'G1' };
+const TYPE_ICONS = { rover: '◉', drone: '◎', agv: '▦' };
+const TYPE_LABELS = { rover: 'Rover', drone: 'Drone', agv: 'AGV' };
+const TYPE_DESCS = {
+  rover: 'High wear rate from ground friction and terrain. Maintenance triggered at health index < 0.4.',
+  drone: 'Moderate wear from rotor stress and wind loading. Battery drain is highest among fleet.',
+  agv: 'Lowest wear rate on flat surfaces. Limited yaw rate preserves mechanical components.',
+};
+
 const MAINT_KINDS = new Set([
   'maintenance_due',
   'health_warning',
+  'health_critical',
   'recharge',
 ]);
 
@@ -72,6 +82,51 @@ function fmtTime(ts) {
 export default function Maintenance() {
   const { frame, events } = useFleet();
   const [filter, setFilter] = useState('ALL');
+  const [backendLog, setBackendLog] = useState(null);
+  const [lifetimeRef, setLifetimeRef] = useState(null);
+  const [fetchError, setFetchError] = useState(null);
+
+  // Fetch real data from backend when not in mock mode
+  useEffect(() => {
+    if (USE_MOCK) return;
+
+    let cancelled = false;
+    const fetchData = async () => {
+      try {
+        const [log, ref] = await Promise.all([
+          getMaintenanceLog(),
+          getLifetimeReference(),
+        ]);
+        if (!cancelled) {
+          setBackendLog(log);
+          setLifetimeRef(ref);
+          setFetchError(null);
+        }
+      } catch (err) {
+        if (!cancelled) setFetchError(err.message);
+      }
+    };
+    fetchData();
+    // Refresh every 10s
+    const interval = setInterval(fetchData, 10000);
+    return () => { cancelled = true; clearInterval(interval); };
+  }, []);
+
+  // Build type info from backend lifetime-reference or fallback
+  const typeInfo = useMemo(() => {
+    if (lifetimeRef && lifetimeRef.length > 0) {
+      return lifetimeRef.map((r) => ({
+        type: r.robot_type,
+        label: TYPE_LABELS[r.robot_type] || r.robot_type,
+        id: TYPE_TO_ID[r.robot_type] || r.robot_type.toUpperCase()[0] + '1',
+        icon: TYPE_ICONS[r.robot_type] || '◉',
+        lifetime: `~${r.typical_operating_duration_mins} min`,
+        interval: `~${r.suggested_maintenance_interval_mins} min`,
+        desc: r.note || TYPE_DESCS[r.robot_type] || r.common_failure_reasons || '',
+      }));
+    }
+    return FALLBACK_TYPE_INFO;
+  }, [lifetimeRef]);
 
   // Current health data per robot from the live frame
   const robotHealth = useMemo(() => {
@@ -83,24 +138,37 @@ export default function Maintenance() {
     return map;
   }, [frame]);
 
-  // Filter maintenance-related events
+  // Maintenance events: use backend log or fall back to stream events
   const maintEvents = useMemo(() => {
+    if (backendLog) {
+      return backendLog
+        .filter((e) => filter === 'ALL' || e.robot_id === filter);
+    }
+    // Fallback: filter stream events
     return events
       .filter((e) => MAINT_KINDS.has(e.kind))
       .filter((e) => filter === 'ALL' || e.robot_id === filter);
-  }, [events, filter]);
+  }, [backendLog, events, filter]);
+
+  const isBackendData = backendLog != null;
 
   return (
     <div>
+      {fetchError && (
+        <div className="mono-sm" style={{ color: 'var(--signal)', marginBottom: 12 }}>
+          ⚠ Could not fetch maintenance data: {fetchError}. Showing stream events.
+        </div>
+      )}
+
       {/* ── Model-Based Estimates ─────────────────── */}
       <div className="panel" style={{ marginBottom: 18 }}>
         <div className="panel-head">
           <span>Robot Type Lifecycle — Model-Based Estimates</span>
-          <span className="tag">Physics Model</span>
+          <span className="tag">{isBackendData ? 'Live Backend' : 'Physics Model'}</span>
         </div>
         <div className="panel-body">
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 16 }}>
-            {TYPE_INFO.map((info) => {
+            {typeInfo.map((info) => {
               const h = robotHealth[info.id];
               const healthIdx = h?.health_index ?? null;
               const rul = h?.rul_s ?? null;
@@ -212,11 +280,14 @@ export default function Maintenance() {
                     <th style={{ textAlign: 'left', padding: '6px 8px' }}>Robot</th>
                     <th style={{ textAlign: 'left', padding: '6px 8px' }}>Severity</th>
                     <th style={{ textAlign: 'left', padding: '6px 8px' }}>Reason</th>
+                    {isBackendData && (
+                      <th style={{ textAlign: 'left', padding: '6px 8px' }}>Action</th>
+                    )}
                   </tr>
                 </thead>
                 <tbody>
-                  {maintEvents.map((evt) => (
-                    <tr key={evt.id} style={{ borderBottom: '1px dashed var(--grid)' }}>
+                  {maintEvents.map((evt, idx) => (
+                    <tr key={evt.id || `log-${idx}`} style={{ borderBottom: '1px dashed var(--grid)' }}>
                       <td style={{ padding: '6px 8px', whiteSpace: 'nowrap' }}>
                         {fmtTime(evt.ts)}
                       </td>
@@ -237,8 +308,14 @@ export default function Maintenance() {
                         </span>
                       </td>
                       <td style={{ padding: '6px 8px' }}>
-                        {evt.message}
+                        {/* Backend log has plain_language_reason; stream events have message */}
+                        {evt.plain_language_reason || evt.message}
                       </td>
+                      {isBackendData && (
+                        <td style={{ padding: '6px 8px', fontSize: 11, color: 'var(--muted)' }}>
+                          {evt.recommended_action || '—'}
+                        </td>
+                      )}
                     </tr>
                   ))}
                 </tbody>

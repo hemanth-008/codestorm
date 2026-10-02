@@ -8,6 +8,7 @@ import Scorecard from './pages/Scorecard';
 import Sandbox from './pages/Sandbox';
 import Monitor from './pages/Monitor';
 import Maintenance from './pages/Maintenance';
+import Login from './pages/Login';
 import { NotificationProvider } from './context/NotificationProvider';
 import ToastContainer from './components/ToastContainer';
 
