@@ -32,7 +32,7 @@ function Spark({ data, dataKeys, colors, domain }) {
             dataKey={k}
             stroke={colors[i]}
             strokeWidth={1.5}
-            strokeDasharray={k.startsWith('pred') ? '3 3' : '0'}
+            strokeDasharray={k.startsWith('pred') ? '3 3' : undefined}
             dot={false}
             isAnimationActive={false}
           />
