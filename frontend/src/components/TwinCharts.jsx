@@ -55,7 +55,7 @@ export default function TwinCharts({ history }) {
       </div>
       <div>
         <div className="kpi-label">Battery (%)</div>
-        <Spark data={history} dataKeys={['est_battery', 'pred_battery']} colors={['#161616', '#6B675B']} domain={[0, 100]} />
+        <Spark data={history} dataKeys={['est_battery', 'pred_battery']} colors={['#161616', '#6B675B']} domain={['auto', 'auto']} />
       </div>
       <div>
         <div className="kpi-label">Temp (°C)</div>
