@@ -35,6 +35,7 @@ function Spark({ data, dataKeys, colors, domain }) {
             strokeDasharray={k.startsWith('pred') ? '3 3' : undefined}
             dot={false}
             isAnimationActive={false}
+            connectNulls={true}
           />
         ))}
       </LineChart>

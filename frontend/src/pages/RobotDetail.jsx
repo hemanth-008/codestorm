@@ -26,7 +26,7 @@ export default function RobotDetail() {
       for (const r of frame.robots) {
         const h = next[r.robot_id] || [];
         const point = {
-          t: r.ts,
+          t: frame.ts,
           residual_pos: r.twin.residual_pos || 0,
           est_battery: r.twin.est?.battery ?? r.telemetry.battery,
           pred_battery: r.twin.pred?.battery, // might be undefined, that's ok
